@@ -1,6 +1,6 @@
 {
-  "buildCommand": "cd cholera-dashboard && npm run build",
-  "outputDirectory": "cholera-dashboard/dist",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
   "rewrites": [
     {
       "source": "/api/health",
