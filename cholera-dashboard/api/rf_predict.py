@@ -18,9 +18,42 @@ app = Flask(__name__)
 CORS(app)
 
 # Base directory - go up two levels from api/ to get to Cholera root
+# For Vercel, files might be in different locations, try multiple paths
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-RF_MODEL_PATH = os.path.join(BASE_DIR, 'random_forest_model.pkl')
-CSV_DATA_PATH = os.path.join(BASE_DIR, 'cholera_data3.csv')
+
+# Try multiple possible paths for model and dataset
+POSSIBLE_MODEL_PATHS = [
+    os.path.join(BASE_DIR, 'random_forest_model.pkl'),  # Root of Cholera repo
+    os.path.join(os.path.dirname(BASE_DIR), 'random_forest_model.pkl'),  # One level up
+    '/var/task/random_forest_model.pkl',  # Vercel serverless function root
+    'random_forest_model.pkl',  # Current directory
+]
+
+POSSIBLE_DATA_PATHS = [
+    os.path.join(BASE_DIR, 'cholera_data3.csv'),  # Root of Cholera repo
+    os.path.join(os.path.dirname(BASE_DIR), 'cholera_data3.csv'),  # One level up
+    '/var/task/cholera_data3.csv',  # Vercel serverless function root
+    'cholera_data3.csv',  # Current directory
+]
+
+# Find the first existing path
+RF_MODEL_PATH = None
+for path in POSSIBLE_MODEL_PATHS:
+    if os.path.exists(path):
+        RF_MODEL_PATH = path
+        break
+
+CSV_DATA_PATH = None
+for path in POSSIBLE_DATA_PATHS:
+    if os.path.exists(path):
+        CSV_DATA_PATH = path
+        break
+
+# Fallback to original paths if not found
+if RF_MODEL_PATH is None:
+    RF_MODEL_PATH = os.path.join(BASE_DIR, 'random_forest_model.pkl')
+if CSV_DATA_PATH is None:
+    CSV_DATA_PATH = os.path.join(BASE_DIR, 'cholera_data3.csv')
 
 # Global model variable
 rf_model = None

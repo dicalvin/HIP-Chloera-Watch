@@ -1,172 +1,143 @@
 # Vercel Deployment Guide
 
-This guide covers deploying both the React frontend and Flask API to Vercel.
+## Quick Start
 
-## Prerequisites
-
-1. Vercel account (sign up at [vercel.com](https://vercel.com))
-2. Vercel CLI installed: `npm install -g vercel`
-
-## Option 1: Deploy via Vercel Dashboard (Recommended)
-
-### Step 1: Deploy Frontend
-
-1. Go to [vercel.com/dashboard](https://vercel.com/dashboard)
-2. Click "Add New..." → "Project"
-3. Import your GitHub repository: `dicalvin/Cholera-Watch`
-4. Configure:
-   - **Framework Preset**: Vite
-   - **Root Directory**: `./` (root)
-   - **Build Command**: `npm run build`
-   - **Output Directory**: `dist`
-5. Click "Deploy"
-
-### Step 2: Deploy API as Separate Service
-
-1. In Vercel dashboard, click "Add New..." → "Project" again
-2. Import the same repository: `dicalvin/Cholera-Watch`
-3. Configure:
-   - **Framework Preset**: Other
-   - **Root Directory**: `api`
-   - **Build Command**: `pip install -r requirements.txt` (or leave empty)
-   - **Output Directory**: Leave empty
-4. Add environment variables:
-   - `PYTHON_VERSION`: `3.11`
-5. Click "Deploy"
-
-**Note**: For the API, you may need to use Vercel's serverless functions. See Option 2 below.
-
-## Option 2: Deploy API as Serverless Function
-
-Vercel supports Python serverless functions. The API is configured to work with this.
-
-### Configuration
-
-The `api/` folder contains:
-- `index.py` - Serverless function entry point
-- `predict.py` - Main Flask app
-- `vercel.json` - Vercel configuration
-
-### Deploy
-
-1. Deploy the entire project (frontend + API):
+1. **Install Vercel CLI** (if deploying via CLI):
    ```bash
+   npm i -g vercel
+   ```
+
+2. **Deploy**:
+   ```bash
+   cd cholera-dashboard
    vercel
    ```
-2. Follow the prompts to link your project
-3. Vercel will automatically detect and deploy both frontend and API
+   Or connect your GitHub repository to Vercel for automatic deployments.
 
-## Option 3: Deploy API Separately (Alternative)
+## Repository Structure for Vercel
 
-If serverless functions don't work well, deploy the API to a separate service:
+```
+cholera-dashboard/
+├── api/                    # Serverless functions
+│   ├── health.py           # Health check endpoint
+│   ├── predict.py          # Single prediction endpoint
+│   ├── forecast.py         # Multi-step forecast endpoint
+│   ├── rf_predict.py       # Shared model logic
+│   └── requirements.txt    # Python dependencies
+├── src/                    # React frontend
+├── public/                 # Static assets
+├── vercel.json             # Vercel configuration
+└── package.json            # Node.js dependencies
+```
 
-### Render.com (Recommended for API)
+## Required Files in Root
 
-1. Go to [render.com](https://render.com)
-2. Create new "Web Service"
-3. Connect GitHub repo: `dicalvin/Cholera-Watch`
-4. Configure:
-   - **Root Directory**: `api`
-   - **Build Command**: `pip install -r requirements.txt`
-   - **Start Command**: `python predict.py`
-   - **Environment**: Python 3
-5. Get your API URL (e.g., `https://cholera-api.onrender.com`)
+For the API to work, these files must be in the **repository root** (not in `cholera-dashboard/`):
+- `random_forest_model.pkl` - Trained model
+- `cholera_data3.csv` - Dataset
 
-6. Update frontend environment variable:
-   - In Vercel dashboard → Your project → Settings → Environment Variables
-   - Add: `VITE_API_URL` = `https://cholera-api.onrender.com/api/predict`
-   - Redeploy frontend
+**Important**: The API functions look for these files in the parent directory. If deploying from the `cholera-dashboard` folder, you may need to adjust paths or copy these files.
 
 ## Environment Variables
 
-### Frontend (Vercel)
+Set in Vercel dashboard (Settings → Environment Variables):
 
-Add these in Vercel dashboard → Settings → Environment Variables:
+- `VITE_LSTM_API_URL` - Leave empty for relative paths (recommended)
+- Or set to your API URL if using external API
 
-- `VITE_API_URL` (optional): Your API URL if deployed separately
-  - If API is on same Vercel project: Leave empty (uses `/api/predict`)
-  - If API is on Render/Railway: Set to full URL
+## API Endpoints
 
-### API (if deployed separately)
+After deployment, the API will be available at:
+- `https://your-project.vercel.app/api/health`
+- `https://your-project.vercel.app/api/lstm/predict`
+- `https://your-project.vercel.app/api/lstm/forecast`
 
-- `PORT`: Usually set automatically by platform
-- `PYTHON_VERSION`: `3.11` (for Vercel)
+## Deployment Steps
 
-## Model Files
+### Option 1: Vercel Dashboard (Recommended)
 
-**Important**: Model files (`.pkl`) are in `.gitignore` because they're large.
+1. Go to https://vercel.com
+2. Sign in with GitHub
+3. Click "New Project"
+4. Import your repository: `dicalvin/HIP-Chloera-Watch`
+5. Configure:
+   - **Root Directory**: `cholera-dashboard`
+   - **Framework Preset**: Vite
+   - **Build Command**: `npm run build`
+   - **Output Directory**: `dist`
+6. Add environment variables (if needed)
+7. Click "Deploy"
 
-### Option A: Upload to Deployment Platform
+### Option 2: Vercel CLI
 
-1. **For Render/Railway**: Use their file upload or connect via SSH
-2. **For Vercel**: Use Vercel CLI to upload:
-   ```bash
-   vercel env add MODEL_PATH
-   # Or upload via dashboard
-   ```
+```bash
+cd cholera-dashboard
+vercel login
+vercel
+```
 
-### Option B: Use GitHub Releases
+For production:
+```bash
+vercel --prod
+```
 
-1. Create a GitHub Release
-2. Attach model files as release assets
-3. Download in deployment setup script
+## File Path Configuration
 
-### Option C: Store in Cloud Storage
+The API functions expect files in the repository root. If your structure is:
 
-1. Upload to AWS S3, Google Cloud Storage, etc.
-2. Download in deployment script using API keys
+```
+Cholera/
+├── cholera_data3.csv
+├── random_forest_model.pkl
+└── cholera-dashboard/
+    └── api/
+```
 
-## Testing Deployment
+The API will find the files correctly. If deploying from `cholera-dashboard/` folder, you may need to:
 
-### Frontend
-- Visit your Vercel URL: `https://your-project.vercel.app`
-- Check that all pages load
-- Test navigation
-
-### API
-- Health check: `https://your-api-url.vercel.app/health`
-- Test prediction: Use the Early Warning page or:
-  ```bash
-  curl -X POST https://your-api-url.vercel.app/api/predict \
-    -H "Content-Type: application/json" \
-    -d '{"suspected": 100, "confirmed": 50, "deaths": 2, "month": 6, "year": 2024, "cfr": 4.0, "positivity": 50.0, "region": "Central", "historicalSuspected": [80, 85, 90, 95, 100]}'
-  ```
+1. Copy files to `cholera-dashboard/` directory, OR
+2. Update paths in `api/rf_predict.py` to look in the correct location
 
 ## Troubleshooting
 
-### API returns 404
-- Check that `api/` folder is properly configured
-- Verify `vercel.json` routes are correct
-- Check Vercel function logs
+### API returns 500 errors
+- Check that `random_forest_model.pkl` and `cholera_data3.csv` are accessible
+- Check Vercel function logs in the dashboard
+- Verify Python dependencies in `api/requirements.txt`
 
 ### CORS errors
-- Ensure `flask-cors` is installed
-- Check that `CORS(app)` is in `predict.py`
-- Verify API URL is correct
+- The API functions include CORS headers
+- If issues persist, check Vercel function logs
 
-### Model not found
-- Upload model files to deployment platform
-- Check `MODEL_PATH` in `predict.py`
-- Verify file paths are correct for deployment environment
+### Model not loading
+- Verify file paths in `api/rf_predict.py`
+- Check that the model file is in the repository
+- Check Vercel function logs for path errors
 
-### Predictions are 0
-- Check browser console for errors
-- Verify API is accessible
-- Check API logs in Vercel dashboard
-- Test API endpoint directly
+### Build fails
+- Ensure `package.json` has correct build script
+- Check that all dependencies are listed
+- Review build logs in Vercel dashboard
 
-## Continuous Deployment
+## Memory and Timeout Settings
 
-Vercel automatically deploys on every push to `main` branch:
-1. Push to GitHub: `git push origin main`
-2. Vercel detects changes
-3. Automatically builds and deploys
-4. You get a preview URL for each deployment
+The `vercel.json` configures:
+- **Memory**: 2048 MB for predict/forecast functions
+- **Timeout**: 30 seconds max duration
 
-## Custom Domain
+If you need more resources, update `vercel.json`.
 
-1. In Vercel dashboard → Settings → Domains
-2. Add your custom domain
-3. Follow DNS configuration instructions
-4. Vercel handles SSL automatically
+## Automatic Deployments
 
+Once connected to GitHub, Vercel will automatically deploy:
+- Every push to `main` branch → Production
+- Pull requests → Preview deployments
+
+## Cost
+
+Vercel's free tier includes:
+- 100 GB bandwidth
+- 100 GB-hours serverless function execution
+- Unlimited deployments
+
+For most use cases, this is sufficient.

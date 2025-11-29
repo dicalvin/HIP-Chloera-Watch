@@ -1,10 +1,18 @@
 {
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist",
+  "buildCommand": "cd cholera-dashboard && npm run build",
+  "outputDirectory": "cholera-dashboard/dist",
   "rewrites": [
     {
-      "source": "/api/(.*)",
-      "destination": "/api/index.py"
+      "source": "/api/health",
+      "destination": "/api/health.py"
+    },
+    {
+      "source": "/api/lstm/predict",
+      "destination": "/api/predict.py"
+    },
+    {
+      "source": "/api/lstm/forecast",
+      "destination": "/api/forecast.py"
     },
     {
       "source": "/(.*)",
@@ -12,7 +20,17 @@
     }
   ],
   "functions": {
-    "api/index.py": {
+    "api/health.py": {
+      "memory": 1024,
+      "maxDuration": 10,
+      "runtime": "python3.11"
+    },
+    "api/predict.py": {
+      "memory": 2048,
+      "maxDuration": 30,
+      "runtime": "python3.11"
+    },
+    "api/forecast.py": {
       "memory": 2048,
       "maxDuration": 30,
       "runtime": "python3.11"
