@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 
-// Use relative path for Vercel deployment, fallback to localhost for development
-const LSTM_API_URL = import.meta.env.VITE_LSTM_API_URL || (import.meta.env.PROD ? '' : 'http://localhost:5001')
+// API URL: Use environment variable, or default to localhost for development
+// For production, set VITE_LSTM_API_URL in Vercel environment variables
+// Example: https://your-api.railway.app
+const LSTM_API_URL = import.meta.env.VITE_LSTM_API_URL || 'http://localhost:5001'
 
 /**
  * Custom hook for LSTM model predictions

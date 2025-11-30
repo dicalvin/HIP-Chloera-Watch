@@ -3,34 +3,8 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
-      "source": "/api/health",
-      "destination": "/api/health.py"
-    },
-    {
-      "source": "/api/lstm/predict",
-      "destination": "/api/predict.py"
-    },
-    {
-      "source": "/api/lstm/forecast",
-      "destination": "/api/forecast.py"
-    },
-    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
-  ],
-  "functions": {
-    "api/health.py": {
-      "memory": 1024,
-      "maxDuration": 10
-    },
-    "api/predict.py": {
-      "memory": 2048,
-      "maxDuration": 30
-    },
-    "api/forecast.py": {
-      "memory": 2048,
-      "maxDuration": 30
-    }
-  }
+  ]
 }
