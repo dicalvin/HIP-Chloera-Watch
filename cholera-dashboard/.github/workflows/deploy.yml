@@ -38,7 +38,7 @@ jobs:
         run: npm run build
         env:
           NODE_ENV: production
-          VITE_BASE_PATH: /HIP-Chloera-Watch/
+          VITE_BASE_PATH: /HIP-Cholera-Watch/
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
