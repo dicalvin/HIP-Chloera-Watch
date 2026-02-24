@@ -14,6 +14,50 @@ const filterByDateRange = (rows, { start, end }) => {
   })
 }
 
+/** Normalize region/district for comparison (trim, treat empty as 'Unknown' where needed) */
+const norm = (v) => (v && String(v).trim()) || ''
+
+/**
+ * Filter rows by selected regions and/or districts.
+ * Empty arrays mean "no filter" (all). Case-insensitive match.
+ */
+const filterByRegionAndDistrict = (rows, { regions = [], districts = [] }) => {
+  if (!rows.length) return []
+  if (regions.length === 0 && districts.length === 0) return rows
+
+  const regionSet = new Set(regions.map((r) => norm(r).toLowerCase()))
+  const districtSet = new Set(districts.map((d) => norm(d).toLowerCase()))
+
+  return rows.filter((row) => {
+    const rowRegion = norm(row.region).toLowerCase()
+    const rowDistrict = norm(row.district || row.location).toLowerCase()
+
+    if (regionSet.size && !regionSet.has(rowRegion)) return false
+    if (districtSet.size && !districtSet.has(rowDistrict)) return false
+    return true
+  })
+}
+
+/**
+ * Get unique regions and districts from data for filter dropdowns.
+ * Returns { regions: string[], districts: string[] } sorted, no empty strings.
+ */
+const getUniqueRegionsAndDistricts = (rows) => {
+  if (!rows || !rows.length) return { regions: [], districts: [] }
+  const regionSet = new Set()
+  const districtSet = new Set()
+  rows.forEach((row) => {
+    const r = norm(row.region)
+    if (r && r !== 'Unknown') regionSet.add(row.region.trim())
+    const d = norm(row.district || row.location)
+    if (d) districtSet.add((row.district || row.location).trim())
+  })
+  return {
+    regions: Array.from(regionSet).sort((a, b) => a.localeCompare(b)),
+    districts: Array.from(districtSet).sort((a, b) => a.localeCompare(b)),
+  }
+}
+
 const aggregateSummary = (rows) => {
   if (!rows.length) {
     return {
@@ -506,6 +550,8 @@ const buildResourcePlanningInsights = (rows, districtStats, breakdowns = null) =
 export {
   formatForInput,
   filterByDateRange,
+  filterByRegionAndDistrict,
+  getUniqueRegionsAndDistricts,
   aggregateSummary,
   buildSChVsCCh,
   buildRegionDistribution,

@@ -7,7 +7,6 @@ import CfrTrendChart from '../components/charts/CfrTrendChart'
 import ConfirmedPositivityTrend from '../components/charts/ConfirmedPositivityTrend'
 import MonthlySuspectedChart from '../components/charts/MonthlySuspectedChart'
 import SeasonalityChart from '../components/charts/SeasonalityChart'
-import MultiLocationForecast from '../components/MultiLocationForecast'
 
 function Analytics({
   loading,
@@ -15,6 +14,12 @@ function Analytics({
   dateRange,
   onDateChange,
   dateBounds,
+  regionOptions,
+  districtOptions,
+  selectedRegions,
+  selectedDistricts,
+  onRegionChange,
+  onDistrictChange,
   summary,
   scatterData,
   regionDistribution,
@@ -46,6 +51,12 @@ function Analytics({
         dateRange={dateRange}
         onDateChange={onDateChange}
         dateBounds={dateBounds}
+        regionOptions={regionOptions}
+        districtOptions={districtOptions}
+        selectedRegions={selectedRegions}
+        selectedDistricts={selectedDistricts}
+        onRegionChange={onRegionChange}
+        onDistrictChange={onDistrictChange}
       />
 
       {loading && <p className="status-text">Loading dataset…</p>}
@@ -53,17 +64,29 @@ function Analytics({
 
       {!loading && !error && (
         <>
-          <SummaryCards summary={summary} />
-          <section className="grid chart-grid">
-            <ConfirmedPositivityTrend series={confirmedPositivity} />
-            <MonthlySuspectedChart data={monthlySuspected} />
-            <SeasonalityChart data={seasonality} />
-            <SuspectedVsConfirmedChart data={scatterData} />
-            <RegionDistributionChart data={regionDistribution} />
-            <CfrTrendChart series={cfrTrend} />
+          <section className="analytics-section analytics-section--summary">
+            <h2 className="analytics-section__title">Summary</h2>
+            <SummaryCards summary={summary} />
           </section>
-          <MultiLocationForecast />
-          <section className="grid chart-grid">
+
+          <section className="analytics-section analytics-section--trends">
+            <h2 className="analytics-section__title">Trends over time</h2>
+            <p className="analytics-section__desc">Case positivity, monthly suspected cases, seasonality, and CFR.</p>
+            <div className="analytics-charts analytics-charts--2col">
+              <ConfirmedPositivityTrend series={confirmedPositivity} />
+              <MonthlySuspectedChart data={monthlySuspected} />
+              <SeasonalityChart data={seasonality} />
+              <CfrTrendChart series={cfrTrend} />
+            </div>
+          </section>
+
+          <section className="analytics-section analytics-section--distribution">
+            <h2 className="analytics-section__title">Distribution & comparison</h2>
+            <p className="analytics-section__desc">Regional burden and suspected vs confirmed cases.</p>
+            <div className="analytics-charts analytics-charts--2col">
+              <RegionDistributionChart data={regionDistribution} />
+              <SuspectedVsConfirmedChart data={scatterData} />
+            </div>
           </section>
         </>
       )}

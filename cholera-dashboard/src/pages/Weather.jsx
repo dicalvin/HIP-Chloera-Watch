@@ -1,51 +1,47 @@
-import { useState } from 'react'
 import { motion } from 'framer-motion'
 import WeatherAlerts from '../components/WeatherAlerts'
 import WeatherImpactAnalysis from '../components/WeatherImpactAnalysis'
-import DistrictDetailsModal from '../components/DistrictDetailsModal'
+import WeatherThreatsList from '../components/WeatherThreatsList'
+import RecentWeatherAnomalies from '../components/RecentWeatherAnomalies'
 
 function Weather() {
-  const [selectedDistrict, setSelectedDistrict] = useState(null)
-  const [isModalOpen, setIsModalOpen] = useState(false)
-
   return (
-    <div className="page">
+    <div className="page page--weather">
       <motion.section
-        className="hero secondary"
+        className="hero hero--secondary"
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, ease: 'easeOut' }}
       >
         <div>
           <p className="eyebrow">Weather monitoring</p>
-          <h1>Real-time weather conditions across districts</h1>
+          <h1>Real-time weather & risk</h1>
           <p className="lede">
-            Monitor current weather conditions, alerts, and forecasts for all districts
-            to assess potential impacts on cholera transmission and response efforts.
+            Monitor current conditions, weather threats, and
+            weather-related cholera risk across districts.
           </p>
         </div>
       </motion.section>
 
-      <WeatherAlerts />
+      <section className="weather-page-sections">
+        <div className="weather-section weather-section--alerts">
+          <WeatherAlerts />
+        </div>
 
-      <WeatherImpactAnalysis
-        onDistrictClick={(districtKey) => {
-          setSelectedDistrict(districtKey)
-          setIsModalOpen(true)
-        }}
-      />
+        <div className="weather-section weather-section--impact">
+          <WeatherImpactAnalysis />
+        </div>
 
-      <DistrictDetailsModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        districtKey={selectedDistrict}
-        onDistrictChange={(newDistrict) => {
-          setSelectedDistrict(newDistrict)
-        }}
-      />
+        <div className="weather-section weather-section--threats">
+          <WeatherThreatsList />
+        </div>
+
+        <div className="weather-section weather-section--anomalies">
+          <RecentWeatherAnomalies />
+        </div>
+      </section>
     </div>
   )
 }
 
 export default Weather
-

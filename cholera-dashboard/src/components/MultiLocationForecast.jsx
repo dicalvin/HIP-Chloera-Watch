@@ -19,6 +19,8 @@ function useLocationWeather(location) {
 
 function MultiLocationForecast() {
   const [selectedLocations, setSelectedLocations] = useState(['kampala', 'gulu', 'mbale'])
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
 
   // Fetch weather for each selected location using individual hooks
   const kampalaData = useLocationWeather('kampala')
@@ -173,25 +175,63 @@ function MultiLocationForecast() {
           <p>
             <strong>Forecast Period:</strong> {forecastPeriod}
           </p>
-          <p>Compare temperature trends across key locations in Uganda</p>
+          <p>Compare temperature trends across Ugandan districts to anticipate climate-sensitive cholera risk.</p>
         </div>
-        <div className="location-checkboxes">
-          {Object.entries(UGANDA_LOCATIONS).map(([key, loc]) => (
-            <label key={key} className="location-checkbox">
+        <div className="location-selector">
+          <button
+            type="button"
+            className="location-selector-toggle"
+            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+          >
+            {selectedLocations.length === 0
+              ? 'Select districts'
+              : `${selectedLocations.length} district${selectedLocations.length > 1 ? 's' : ''} selected`}
+          </button>
+          {isDropdownOpen && (
+            <div className="location-selector-dropdown">
               <input
-                type="checkbox"
-                checked={selectedLocations.includes(key)}
-                onChange={(e) => {
-                  if (e.target.checked) {
-                    setSelectedLocations([...selectedLocations, key])
-                  } else {
-                    setSelectedLocations(selectedLocations.filter((l) => l !== key))
-                  }
-                }}
+                type="text"
+                className="location-search-input"
+                placeholder="Search district..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
               />
-              <span>{loc.name}</span>
-            </label>
-          ))}
+              <div className="location-options">
+                {Object.entries(UGANDA_LOCATIONS)
+                  .filter(([_, loc]) =>
+                    loc.name.toLowerCase().includes(searchTerm.toLowerCase()),
+                  )
+                  .map(([key, loc]) => {
+                    const checked = selectedLocations.includes(key)
+                    return (
+                      <label key={key} className="location-option">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedLocations([...selectedLocations, key])
+                            } else {
+                              // Prevent clearing the last selected location
+                              if (selectedLocations.length === 1 && checked) {
+                                return
+                              }
+                              setSelectedLocations(
+                                selectedLocations.filter((id) => id !== key),
+                              )
+                            }
+                          }}
+                        />
+                        <span>{loc.name}</span>
+                      </label>
+                    )
+                  })}
+              </div>
+              <p className="location-help-text">
+                At least one district must remain selected so the forecast always has context.
+              </p>
+            </div>
+          )}
         </div>
       </div>
 

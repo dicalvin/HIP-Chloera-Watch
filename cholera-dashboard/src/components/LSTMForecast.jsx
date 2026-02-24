@@ -12,15 +12,14 @@ import {
   Tooltip,
   Legend,
 } from 'recharts'
-import useLSTMPredictions from '../hooks/useLSTMPredictions'
+import useXGBoostPredictions from '../hooks/useXGBoostPredictions'
 import useWeatherData, { UGANDA_LOCATIONS } from '../hooks/useWeatherData'
 
 /**
- * Forecast Component
- * Displays AI-powered forecasts for cholera cases (Random Forest)
+ * Forecast Component – XGBoost model predictions for suspected cholera cases (sCh).
  */
 function LSTMForecast({ historicalData, region = 'Central', district = null }) {
-  const { loading, error, modelAvailable, getForecast } = useLSTMPredictions()
+  const { loading, error, modelAvailable, getForecast } = useXGBoostPredictions()
   const [forecastData, setForecastData] = useState(null)
   const [selectedDistrict, setSelectedDistrict] = useState(district || 'kampala')
   
@@ -30,8 +29,7 @@ function LSTMForecast({ historicalData, region = 'Central', district = null }) {
   // Prepare forecast data - try even if model not available (API has fallback)
   useEffect(() => {
     if (!historicalData || historicalData.length === 0) {
-      // Still try - API can auto-load from dataset
-      console.log('No historical data provided, API will auto-load from dataset')
+      console.log('No historical data from Supabase; forecast may use zeros for history')
     }
 
     const fetchForecast = async () => {
@@ -54,7 +52,7 @@ function LSTMForecast({ historicalData, region = 'Central', district = null }) {
       const districtRegion = location?.region || region
       const districtName = location?.name
 
-      // Prepare prediction data - API will auto-load historical data if not provided
+      // Prepare prediction data; historicalSuspected comes from Supabase (filteredData)
       const predictionData = {
         date: new Date().toISOString().split('T')[0],
         region: districtRegion,
@@ -62,8 +60,7 @@ function LSTMForecast({ historicalData, region = 'Central', district = null }) {
         temperature,
         humidity,
         precipitation,
-        // Let API auto-load from dataset if historicalSuspected is empty
-        historicalSuspected: historicalSuspected.length >= 7 ? historicalSuspected : [],
+        historicalSuspected: historicalSuspected.length > 0 ? historicalSuspected : [],
       }
 
       // Get 14-day forecast
@@ -76,20 +73,20 @@ function LSTMForecast({ historicalData, region = 'Central', district = null }) {
     fetchForecast()
   }, [historicalData, selectedDistrict, weatherData, region, getForecast])
 
-  // Prepare chart data with cumulative totals (divided by 1000 for display)
+  // Chart data: use raw predicted values so graph and summary boxes share the same scale
   const chartData = useMemo(() => {
     if (!forecastData) return []
 
     let cumulative = 0
     return forecastData.map((item) => {
       const date = new Date(item.date)
-      const predictedScaled = item.predicted / 1000  // Divide by 1000 for display
-      cumulative += predictedScaled
+      const predicted = Number(item.predicted)
+      cumulative += predicted
       return {
         date: item.date,
         label: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
         year: date.getFullYear(),
-        predicted: Math.round(predictedScaled * 100) / 100,  // Round to 2 decimals
+        predicted: Math.round(predicted * 100) / 100,
         cumulative: Math.round(cumulative * 100) / 100,
       }
     })
@@ -126,7 +123,13 @@ function LSTMForecast({ historicalData, region = 'Central', district = null }) {
           <h3>AI-Powered Forecast</h3>
           <p>Machine learning predictions based on historical patterns and weather conditions.</p>
         </div>
-        <div className="status-text error">{error}</div>
+        <div className="status-text error">
+          <strong>Error:</strong> {error}
+          <br />
+          <small style={{ marginTop: '0.5rem', display: 'block', opacity: 0.9 }}>
+            Ensure the XGBoost API is running at <code>http://localhost:5001</code> and <code>xgboost_model.joblib</code> is in the Cholera project folder.
+          </small>
+        </div>
       </motion.section>
     )
   }
@@ -150,11 +153,11 @@ function LSTMForecast({ historicalData, region = 'Central', district = null }) {
               <strong>Error:</strong> {error}
               <br />
               <small style={{ marginTop: '0.5rem', display: 'block' }}>
-                Make sure the LSTM API is running: <code>cd cholera-dashboard/api && python lstm_predict.py</code>
+                Run the XGBoost API from the project root: <code>cd cholera-dashboard/api && python xgboost_predict.py</code>. Ensure <code>xgboost_model.joblib</code> is in the Cholera folder.
               </small>
             </>
           ) : (
-            'Loading forecast... The API will automatically load historical data from the dataset.'
+            'Loading forecast… Send historical data from Supabase to the XGBoost API.'
           )}
         </div>
       </motion.section>
@@ -162,13 +165,14 @@ function LSTMForecast({ historicalData, region = 'Central', district = null }) {
   }
   
   // Get model type from forecast data
-  const modelType = forecastData[0]?.model_type || 'LSTM'
+  const modelType = forecastData[0]?.model_type || 'XGBoost'
 
-  // Calculate summary statistics (scaled by 1000 for display)
-  const totalPredicted = forecastData.reduce((sum, item) => sum + item.predicted, 0) / 1000
-  const avgPredicted = totalPredicted / forecastData.length
-  const maxPredicted = Math.max(...forecastData.map((item) => item.predicted)) / 1000
-  const minPredicted = Math.min(...forecastData.map((item) => item.predicted)) / 1000
+  // Summary statistics: use same values as the graph (from chartData) so numbers add up
+  const peakPredicted = chartData.length > 0 ? Math.max(...chartData.map((d) => d.predicted)) : 0
+  const minPredicted = chartData.length > 0 ? Math.min(...chartData.map((d) => d.predicted)) : 0
+  const totalPredicted = chartData.length > 0 ? chartData.reduce((sum, d) => sum + d.predicted, 0) : 0
+  const avgPredicted = chartData.length > 0 ? totalPredicted / chartData.length : 0
+  const cumulativeTotal = chartData.length > 0 ? chartData[chartData.length - 1].cumulative : 0
   
   // Get prediction year range
   const predictionYear = chartData.length > 0 ? chartData[0].year : new Date().getFullYear()
@@ -187,17 +191,17 @@ function LSTMForecast({ historicalData, region = 'Central', district = null }) {
         <div>
           <h3>AI-Powered Forecast (14 Days) - {yearRange}</h3>
           <p>
-            Random Forest model predictions for suspected cholera cases, incorporating historical trends, weather conditions, and geographical factors.
+            XGBoost model predictions for suspected cholera cases (sCh).
           </p>
         </div>
         <div className="forecast-badges">
           <div className="forecast-badge">
             <span className="badge-label">Cumulative Total</span>
-            <span className="badge-value">{chartData.length > 0 ? Math.round(chartData[chartData.length - 1].cumulative).toLocaleString() : '0'}</span>
+            <span className="badge-value">{cumulativeTotal.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })}</span>
           </div>
           <div className="forecast-badge">
             <span className="badge-label">Avg/Day</span>
-            <span className="badge-value">{Math.round(avgPredicted).toLocaleString()}</span>
+            <span className="badge-value">{avgPredicted.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })}</span>
           </div>
         </div>
       </div>
@@ -235,7 +239,7 @@ function LSTMForecast({ historicalData, region = 'Central', district = null }) {
             yAxisId="left"
             type="monotone"
             dataKey="predicted"
-            name="Daily Predicted Cases (thousands)"
+            name="Daily Predicted Cases (sCh)"
             stroke="#8b5cf6"
             fill="url(#lstmGradient)"
             strokeWidth={2}
@@ -244,7 +248,7 @@ function LSTMForecast({ historicalData, region = 'Central', district = null }) {
             yAxisId="right"
             type="monotone"
             dataKey="cumulative"
-            name="Cumulative Total (thousands)"
+            name="Cumulative Total (sCh)"
             stroke="#10b981"
             strokeWidth={2}
             dot={false}
@@ -255,23 +259,23 @@ function LSTMForecast({ historicalData, region = 'Central', district = null }) {
       <div className="forecast-summary-grid" style={{ marginTop: '1.5rem' }}>
         <div className="summary-item">
           <span className="summary-label">Peak Prediction</span>
-          <span className="summary-value">{Math.round(maxPredicted).toLocaleString()}</span>
+          <span className="summary-value">{peakPredicted.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })}</span>
         </div>
         <div className="summary-item">
           <span className="summary-label">Minimum Prediction</span>
-          <span className="summary-value">{Math.round(minPredicted).toLocaleString()}</span>
+          <span className="summary-value">{minPredicted.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })}</span>
         </div>
         <div className="summary-item">
           <span className="summary-label">Average Daily</span>
-          <span className="summary-value">{Math.round(avgPredicted).toLocaleString()}</span>
+          <span className="summary-value">{avgPredicted.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })}</span>
         </div>
         <div className="summary-item">
           <span className="summary-label">14-Day Total</span>
-          <span className="summary-value">{Math.round(totalPredicted).toLocaleString()}</span>
+          <span className="summary-value">{totalPredicted.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })}</span>
         </div>
         <div className="summary-item">
           <span className="summary-label">Cumulative Total</span>
-          <span className="summary-value">{chartData.length > 0 ? Math.round(chartData[chartData.length - 1].cumulative).toLocaleString() : '0'}</span>
+          <span className="summary-value">{cumulativeTotal.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })}</span>
         </div>
         <div className="summary-item">
           <span className="summary-label">Prediction Year</span>

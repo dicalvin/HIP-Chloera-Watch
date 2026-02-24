@@ -1,5 +1,4 @@
 import { motion } from 'framer-motion'
-import LSTMForecast from '../components/LSTMForecast'
 
 function ResourcePlanning({ loading, error, resourcePlanning, filteredData, summary }) {
   if (loading) {
@@ -70,8 +69,6 @@ function ResourcePlanning({ loading, error, resourcePlanning, filteredData, summ
           </table>
         </div>
       </motion.section>
-
-
       <section className="grid chart-grid">
         <motion.article
           className="chart-card"
@@ -133,5 +130,4 @@ function ResourcePlanning({ loading, error, resourcePlanning, filteredData, summ
 }
 
 export default ResourcePlanning
-
 

@@ -19,10 +19,12 @@ function CholeraMap({
   districtStats = { districtLookup: {}, maxConfirmed: 0 },
   dateRange,
   geoError,
+  dataUpdatedAt,
 }) {
   const rangeStart = dateRange?.start || 'earliest record'
   const rangeEnd = dateRange?.end || 'latest record'
   const geoJsonRef = useRef(null)
+  const mapDataKey = dataUpdatedAt ? dataUpdatedAt.getTime() : 0
 
   const styledGeoJson = useMemo(() => {
     if (!geoData) return null
@@ -113,6 +115,7 @@ function CholeraMap({
             url="https://cartodb-basemaps-{s}.global.ssl.fastly.net/light_all/{z}/{x}/{y}.png"
           />
           <GeoJSON
+            key={mapDataKey}
             data={styledGeoJson}
             whenCreated={(layer) => {
               geoJsonRef.current = layer

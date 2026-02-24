@@ -1,7 +1,5 @@
 import { useEffect, useState } from 'react'
-import Papa from 'papaparse'
-
-const DATA_URL = '/cholera_data3.csv'
+import { supabase, isSupabaseConfigured } from '../lib/supabaseClient'
 
 const numberValue = (value) => {
   const parsed = Number(value)
@@ -10,46 +8,39 @@ const numberValue = (value) => {
 
 const parseRow = (row, idx) => {
   let reportingDate = null
+
   if (row.reporting_date) {
-    const dateStr = String(row.reporting_date).trim()
-    // Handle DD/MM/YYYY format (e.g., "29/10/2015")
-    const ddmmyyyy = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
-    if (ddmmyyyy) {
-      const [, day, month, year] = ddmmyyyy
-      const dayNum = parseInt(day, 10)
-      const monthNum = parseInt(month, 10)
-      const yearNum = parseInt(year, 10)
-      reportingDate = new Date(yearNum, monthNum - 1, dayNum)
-      // Simple validation - just check if date is valid
-      if (Number.isNaN(reportingDate.valueOf())) {
-        reportingDate = null
-      }
-    } else {
-      // Try standard Date parsing for other formats
-      const dateValue = new Date(dateStr)
-      if (!Number.isNaN(dateValue.valueOf())) {
-        reportingDate = dateValue
-      }
+    const dateValue = new Date(row.reporting_date)
+    if (!Number.isNaN(dateValue.valueOf())) {
+      reportingDate = dateValue
     }
   }
 
   return {
-    id: row.Index ?? idx,
-    location: row.Location ?? row.District ?? 'Unknown',
-    region: row.Region && row.Region.trim() ? row.Region.trim() : 'Unknown',
-    district: row.District && row.District.trim() ? row.District.trim() : '',
-    sCh: numberValue(row.sCh),
-    cCh: numberValue(row.cCh),
-    CFR: numberValue(row.CFR),
+    id: row.id ?? row.index ?? idx,
+    location: row.location ?? row.district ?? 'Unknown',
+    region:
+      row.region && row.region.trim()
+        ? row.region.trim()
+        : 'Unknown',
+    district:
+      row.district && row.district.trim()
+        ? row.district.trim()
+        : '',
+    sCh: numberValue(row.sch ?? row.sCh),
+    cCh: numberValue(row.cch ?? row.cCh),
+    CFR: numberValue(row.cfr ?? row.CFR),
     deaths: numberValue(row.deaths),
     reportingDate,
     reportingDateRaw: row.reporting_date ?? '',
-    TL: row.TL,
-    TR: row.TR,
+    TL: row.tl ?? row.TL,
+    TR: row.tr ?? row.TR,
     source: row.source,
     raw: row,
   }
 }
+
+const POLL_INTERVAL_MS = 30_000 // 30s fallback when Realtime is unavailable
 
 function useCholeraData() {
   const [data, setData] = useState([])
@@ -57,73 +48,108 @@ function useCholeraData() {
   const [error, setError] = useState('')
   const [minDate, setMinDate] = useState(null)
   const [maxDate, setMaxDate] = useState(null)
+  const [lastUpdatedAt, setLastUpdatedAt] = useState(null)
+
+  const fetchData = async () => {
+    if (!isSupabaseConfigured || !supabase) {
+      setError(
+        'Supabase is not configured. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.',
+      )
+      setLoading(false)
+      return
+    }
+
+    try {
+      const { data: rows, error: supaError } = await supabase
+        .from('cholera_reports')
+        .select(
+          'id,index,location,tl,tr,deaths,sch,cch,cfr,reporting_date,source_index,source,confidence_weight,processing_notes,source_database,district,region',
+        )
+
+      if (supaError) {
+        console.error('Supabase query error:', supaError)
+        setError(supaError.message || 'Failed to load dataset from Supabase.')
+        setLoading(false)
+        return
+      }
+
+      if (!rows || rows.length === 0) {
+        setError('No records found in Supabase table cholera_reports.')
+        setLoading(false)
+        return
+      }
+
+      const parsedRows = rows.map(parseRow)
+      const validRows = parsedRows.filter((row) => row.reportingDate)
+
+      if (!validRows.length) {
+        setError(
+          'No dated records were found in the Supabase dataset. Check reporting_date values.',
+        )
+        setLoading(false)
+        return
+      }
+
+      const timestamps = validRows.map((row) => row.reportingDate.valueOf())
+      const min = new Date(Math.min(...timestamps))
+      const max = new Date(Math.max(...timestamps))
+
+      setMinDate(min)
+      setMaxDate(max)
+      setData(validRows)
+      setError('')
+      setLastUpdatedAt(new Date())
+    } catch (err) {
+      console.error('Unexpected Supabase fetch error:', err)
+      setError(err.message || 'Failed to load dataset from Supabase.')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    Papa.parse(DATA_URL, {
-      download: true,
-      header: true,
-      skipEmptyLines: true,
-      complete: (results) => {
-        console.log('CSV loaded, total rows:', results.data.length)
-        if (!results.data || results.data.length === 0) {
-          console.error('CSV is empty')
-          setError('Dataset is empty.')
-          setLoading(false)
-          return
-        }
-        
-        // Show sample of first few rows for debugging
-        console.log('First 3 rows sample:', results.data.slice(0, 3).map(r => ({
-          reporting_date: r.reporting_date,
-          sCh: r.sCh,
-          cCh: r.cCh
-        })))
-        
-        const parsedRows = results.data.map(parseRow)
-        const validRows = parsedRows.filter((row) => row.reportingDate)
-        const invalidRows = parsedRows.filter((row) => !row.reportingDate)
-        
-        console.log('Valid rows with dates:', validRows.length, 'out of', parsedRows.length)
-        if (invalidRows.length > 0) {
-          console.log('Sample invalid row:', {
-            reporting_date: invalidRows[0]?.reportingDateRaw,
-            raw: invalidRows[0]?.raw?.reporting_date
-          })
-        }
-
-        if (!validRows.length) {
-          console.error('No valid dates found. Sample parsed row:', parsedRows[0])
-          setError('No dated records were found in the dataset. Check date format.')
-          setLoading(false)
-          return
-        }
-
-        const timestamps = validRows.map((row) => row.reportingDate.valueOf())
-        const minDate = new Date(Math.min(...timestamps))
-        const maxDate = new Date(Math.max(...timestamps))
-        setMinDate(minDate)
-        setMaxDate(maxDate)
-        
-        console.log('Date range:', minDate.toISOString(), 'to', maxDate.toISOString())
-        console.log('Setting data with', validRows.length, 'rows')
-        console.log('Sample valid row:', {
-          date: validRows[0].reportingDate.toISOString(),
-          sCh: validRows[0].sCh,
-          cCh: validRows[0].cCh
-        })
-        
-        setData(validRows)
-        setLoading(false)
-      },
-      error: (err) => {
-        console.error('PapaParse error:', err)
-        setError(err.message || 'Failed to load dataset.')
-        setLoading(false)
-      },
-    })
+    fetchData()
   }, [])
 
-  return { data, loading, error, minDate, maxDate }
+  // Realtime: refetch when cholera_reports changes. Requires in Supabase:
+  // Database → Replication → add cholera_reports to supabase_realtime publication.
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase) return
+
+    const channel = supabase
+      .channel('cholera_reports_realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'cholera_reports',
+        },
+        () => {
+          fetchData()
+        },
+      )
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR') {
+          console.warn(
+            '[Cholera] Realtime not available. Enable it in Supabase: Database → Replication → add cholera_reports to supabase_realtime. Polling will refresh data every 45s.',
+          )
+        }
+      })
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [])
+
+  // Polling fallback: refresh regularly so new rows appear even if Realtime isn't enabled
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase) return
+    const interval = setInterval(fetchData, POLL_INTERVAL_MS)
+    return () => clearInterval(interval)
+  }, [])
+
+  return { data, loading, error, minDate, maxDate, lastUpdatedAt, refetch: fetchData }
 }
 
 export default useCholeraData

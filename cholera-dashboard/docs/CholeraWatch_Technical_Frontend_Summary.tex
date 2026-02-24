@@ -1,0 +1,218 @@
+% Cholera Watch: Technical and Frontend Summary
+% Health Intelligence Platform — System Documentation
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{parskip}
+\usepackage{enumitem}
+
+\geometry{margin=2.5cm}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.6em}
+
+\title{\textbf{Cholera Watch}\\Technical and Frontend Summary\\\large Health Intelligence Platform}}
+\author{System Documentation}
+\date{\today}
+
+\begin{document}
+\maketitle
+\tableofcontents
+\newpage
+
+%==============================================================================
+\section{Introduction and System Overview}
+%==============================================================================
+
+Cholera Watch is a health intelligence platform for surveillance, analytics, and geospatial insight into cholera cases across Uganda. The system combines a real-time dashboard frontend with a Supabase-backed data layer and an optional XGBoost prediction API to support situational awareness, response planning, and early warning.
+
+\subsection{Purpose and Scope}
+
+The platform is designed to:
+\begin{itemize}[noitemsep]
+    \item Ingest and display cholera surveillance data (suspected cases sCh, confirmed cases cCh, deaths, CFR) from a central Supabase table.
+    \item Provide interactive filtering by date range, region, and district so users can focus on specific time windows and locations.
+    \item Visualise trends (positivity, seasonality, CFR), regional distribution, and district-level burden via charts and an interactive map.
+    \item Integrate weather and threat data to support early warning and resource planning.
+    \item Optionally expose 14-day case forecasts via an XGBoost model served by a small Python API.
+\end{itemize}
+
+\subsection{High-Level Architecture}
+
+The system is composed of three main parts:
+
+\begin{enumerate}[noitemsep]
+    \item \textbf{Frontend (React/Vite):} A single-page application (SPA) that fetches data from Supabase, applies filters, and renders dashboards. It can call an external prediction API for forecasts.
+    \item \textbf{Data layer (Supabase):} PostgreSQL hosting the \texttt{cholera\_reports} table, with Row Level Security (RLS), optional Realtime subscriptions, and replication for live updates.
+    \item \textbf{Prediction API (Python/Flask):} A separate service that loads a pre-trained XGBoost model (\texttt{xgboost\_model.joblib}) and exposes REST endpoints for 14-day suspected-case forecasts. The frontend sends historical series and context in the request body; the API does not access Supabase or CSV directly.
+\end{enumerate}
+
+Data flows from Supabase into the React app; filters (date, region, district) are applied client-side. All derived analytics (summaries, time series, district aggregates) are computed in the browser from the filtered dataset. The map and charts react to the same filtered data and to a \texttt{lastUpdatedAt} timestamp so that when the database is updated (via Realtime or polling), the entire UI, including the map, reflects the latest state.
+
+\newpage
+
+%==============================================================================
+\section{Technical Stack and Dependencies}
+%==============================================================================
+
+\subsection{Frontend Stack}
+
+The dashboard is built with modern JavaScript tooling and libraries:
+
+\begin{itemize}[noitemsep]
+    \item \textbf{React 19} and \textbf{React DOM 19} for the component-based UI.
+    \item \textbf{Vite 7} for development server, bundling, and production builds (ES modules, fast HMR).
+    \item \textbf{React Router DOM 7} for client-side routing (Overview, Analytics, Response Insights, Early Warning, Weather, Resource Planning, Data Admin).
+    \item \textbf{Supabase JS client} (\texttt{@supabase/supabase-js}) for connecting to the Supabase project: queries, optional Realtime subscriptions, and (if used) authenticated requests.
+    \item \textbf{Recharts 3} for line charts, area charts, bar charts, and composed charts (e.g.\ positivity trends, seasonality, region distribution, suspected vs confirmed).
+    \item \textbf{Leaflet} and \textbf{React-Leaflet 5} for the Uganda district map: GeoJSON boundaries, district shading by confirmed cases, and popups with suspected/confirmed/deaths.
+    \item \textbf{Framer Motion 12} for section and card animations (e.g.\ fade-in, stagger).
+    \item \textbf{date-fns 4} and \textbf{PapaParse 5} for date handling and optional CSV parsing (e.g.\ in Data Admin).
+\end{itemize}
+
+The frontend does not use a global state library; application state is held in \texttt{App.jsx} (date range, region/district filters, cholera data from \texttt{useCholeraData}) and passed down via props. Derived data is computed with \texttt{useMemo} from the raw and filtered datasets.
+
+\subsection{Backend and Prediction Service}
+
+The prediction service is a small Flask application:
+
+\begin{itemize}[noitemsep]
+    \item \textbf{Flask} with \textbf{Flask-CORS} for HTTP and cross-origin requests.
+    \item \textbf{NumPy} and \textbf{scikit-learn/joblib} for loading and running the XGBoost model.
+    \item The model file \texttt{xgboost\_model.joblib} is loaded once at startup; the API resolves its path relative to the Cholera project root and \texttt{cholera-dashboard} directory.
+\end{itemize}
+
+Endpoints typically include a health check and POST routes for single-step prediction and 14-day forecast. The API expects a JSON body (e.g.\ \texttt{historicalSuspected}, \texttt{date}, \texttt{region}, \texttt{district}) and returns predicted values. It does not connect to Supabase or read CSV files; all input is provided by the client.
+
+\subsection{Data and Infrastructure}
+
+\begin{itemize}[noitemsep]
+    \item \textbf{Supabase:} Hosted PostgreSQL, optional Realtime (Postgres Changes) for \texttt{cholera\_reports}, and RLS policies restricting inserts/updates (e.g.\ to authenticated users) while allowing the anon key to read.
+    \item \textbf{GeoJSON:} Uganda district boundaries are loaded from a static \texttt{ug.json} file and combined with per-district statistics for map rendering.
+    \item \textbf{Environment:} The frontend uses Vite env variables (e.g.\ \texttt{VITE\_SUPABASE\_URL}, \texttt{VITE\_SUPABASE\_ANON\_KEY}, \texttt{VITE\_XGBOOST\_API\_URL}) for configuration; the API runs on a configurable port (e.g.\ 5001).
+\end{itemize}
+
+\newpage
+
+%==============================================================================
+\section{Data Flow and Real-Time Behaviour}
+%==============================================================================
+
+\subsection{Cholera Data Pipeline}
+
+Surveillance data is stored in Supabase in the \texttt{cholera\_reports} table. Each row typically includes identifiers (\texttt{id}, \texttt{index}), location (\texttt{district}, \texttt{region}, \texttt{location}), metrics (\texttt{sch}, \texttt{cch}, \texttt{cfr}, \texttt{deaths}), temporal fields (\texttt{reporting\_date}, \texttt{tl}, \texttt{tr}), and metadata (\texttt{source}, \texttt{confidence\_weight}, etc.). The frontend selects a fixed set of columns and normalises values (e.g.\ numeric parsing, date parsing) in a custom hook \texttt{useCholeraData}.
+
+\subsection{useCholeraData Hook}
+
+The hook is the single source of truth for cholera records in the app:
+
+\begin{itemize}[noitemsep]
+    \item On mount it runs an initial \texttt{select} on \texttt{cholera\_reports} and parses rows into a normalised structure (e.g.\ \texttt{sCh}, \texttt{cCh}, \texttt{CFR}, \texttt{reportingDate}, \texttt{region}, \texttt{district}).
+    \item It subscribes to Supabase Realtime \texttt{postgres\_changes} on \texttt{public.cholera\_reports} for \texttt{INSERT}, \texttt{UPDATE}, and \texttt{DELETE}. On any such event it refetches the full table so the UI always reflects the latest data.
+    \item As a fallback when Realtime is unavailable or not enabled for the table, a \texttt{setInterval} runs the same fetch every 30 seconds.
+    \item The hook exposes \texttt{data}, \texttt{loading}, \texttt{error}, \texttt{minDate}, \texttt{maxDate}, \texttt{lastUpdatedAt}, and \texttt{refetch}. \texttt{lastUpdatedAt} is set after each successful fetch and is used by the layout to show a ``Data live'' indicator and by the map to force a redraw when data changes (via a \texttt{key} on the GeoJSON layer).
+\end{itemize}
+
+Ensuring the table is added to the \texttt{supabase\_realtime} publication in Supabase is required for instant updates; otherwise only the 30-second polling applies.
+
+\subsection{Filtering and Derived Analytics}
+
+In \texttt{App.jsx}, the raw \texttt{data} from \texttt{useCholeraData} is filtered in two steps:
+
+\begin{enumerate}[noitemsep]
+    \item \textbf{Date range:} \texttt{filterByDateRange(data, effectiveDateRange)} keeps only rows whose \texttt{reportingDate} falls within the selected start and end dates. The effective range is derived from user inputs and constrained to the dataset bounds (e.g.\ 2011--2024).
+    \item \textbf{Location:} \texttt{filterByRegionAndDistrict(...)} keeps only rows whose \texttt{region} and/or \texttt{district} are in the selected lists (empty selection means no filter).
+\end{enumerate}
+
+The result is \texttt{filteredData}. A large \texttt{useMemo} then builds all derived structures from \texttt{filteredData}: \texttt{aggregateSummary}, \texttt{buildRegionDistribution}, \texttt{buildCfrTrend}, \texttt{buildDistrictAggregates}, \texttt{buildInsights}, \texttt{buildResponseInsights}, \texttt{buildEarlyWarningInsights}, \texttt{buildResourcePlanningInsights}, and related series for charts. These are passed as props to the respective pages. The map receives \texttt{districtStats} (from \texttt{buildDistrictAggregates}) and \texttt{dataUpdatedAt} (from \texttt{lastUpdatedAt}); the GeoJSON component uses \texttt{dataUpdatedAt} as part of its \texttt{key} so that when the database is updated and the hook refetches, the map layers are recreated with the new shading and popups.
+
+\subsection{Map and Realtime Consistency}
+
+The Uganda situational overview map (CholeraMap) shades districts by confirmed cases and shows popups with suspected, confirmed, and deaths. \texttt{styledGeoJson} is computed with \texttt{useMemo} from \texttt{geoData} and \texttt{districtStats}; the React-Leaflet \texttt{GeoJSON} component is given \texttt{key=\{mapDataKey\}} where \texttt{mapDataKey} is derived from \texttt{dataUpdatedAt}. Thus, whenever \texttt{lastUpdatedAt} changes (after a Realtime event or a polling refresh), the GeoJSON remounts and the map reflects the latest district counts and interactions without requiring a full page reload.
+
+\newpage
+
+%==============================================================================
+\section{Frontend Structure and Pages}
+%==============================================================================
+
+\subsection{Routing and Layout}
+
+The application uses a single \texttt{BrowserRouter} and \texttt{Routes} in \texttt{App.jsx}. A shared \texttt{Layout} component wraps all route content. On viewports $\geq$1024px the layout shows a left sidebar (brand, navigation links with icons, and a meta block with report count and ``Data live'' / last-updated text). On smaller viewports the sidebar is replaced by a top bar with a hamburger menu that expands to show the same links and icons. The main content area is a \texttt{main} element that receives \texttt{children} (the matched route component). Navigation targets:
+
+\begin{itemize}[noitemsep]
+    \item \texttt{/} --- Overview
+    \item \texttt{/analytics} --- Analytics \& Filters
+    \item \texttt{/response-insights} --- Response Insights
+    \item \texttt{/early-warning} --- Early Warning
+    \item \texttt{/weather} --- Weather
+    \item \texttt{/resource-planning} --- Resource Planning
+    \item \texttt{/data-admin} --- Data Admin
+\end{itemize}
+
+\subsection{Overview}
+
+The landing page shows a hero section, summary cards (e.g.\ total reports, suspected, confirmed, deaths, CFR, positivity), the Uganda district map (CholeraMap) with the current date range and \texttt{dataUpdatedAt}, and a ``Key takeaways'' list built from \texttt{insights}. A metric breakdown modal can be opened from the summary cards. All data is driven by the same \texttt{filteredData} and \texttt{memoizedData} from \texttt{App.jsx}.
+
+\subsection{Analytics and Filters}
+
+This page includes the central \texttt{FilterPanel}: date presets (Last 30 days, 90 days, Year to date, All data), start/end date inputs, and a Location section with two card-style multi-selects (Regions and Districts) with optional search. Selections are stored in \texttt{App} state and affect \texttt{filteredData} globally. Below the panel, content is grouped into sections: Summary (summary cards), Trends over time (e.g.\ Confirmed Positivity, Monthly Suspected, Seasonality, CFR Trend), and Distribution \& comparison (Region Distribution, Suspected vs Confirmed). Charts are rendered with Recharts in a two-column grid on large screens.
+
+\subsection{Response Insights}
+
+Presents spread-pattern analysis (e.g.\ monthly suspected vs confirmed with growth rate), outbreak threshold monitoring, risk regions, vulnerable populations (death burden), and list-based insights. All series and lists are derived from \texttt{spreadInsights} and related memoised data; no forecast block is shown on this page.
+
+\subsection{Early Warning}
+
+Includes alert threshold monitoring (e.g.\ confirmed cases vs rolling average), Weather Threats list (14-day forecast–based threats across locations), recent alert anomalies, and an optional 14-day AI-powered forecast block (LSTMForecast/XGBoost) when \texttt{filteredData} is available.
+
+\subsection{Weather}
+
+Dedicated to weather and cholera-risk context: a hero, then sections for Weather Alerts (district carousel and alerts), Weather Impact Analysis (district cards and impact summary), Weather Threats Forecast (14-day threats list), and Recent Weather Anomalies (recent significant weather events). No separate 14-day temperature forecast block is shown on this page.
+
+\subsection{Resource Planning}
+
+Shows priority area identification (table of districts by confirmed, suspected, deaths, share), Impact assessment (totals and CFR in cards), and Resource pressure signals (regions by pressure score). No AI Guidance or forecast section is rendered here.
+
+\subsection{Data Admin}
+
+Allows upload or paste of data (e.g.\ CSV) and upsert into \texttt{cholera\_reports} via the Supabase client. Intended for authenticated or controlled use given RLS; the UI does not enforce auth.
+
+\subsection{Shared Components and Charts}
+
+Reusable building blocks include \texttt{SummaryCards}, \texttt{FilterPanel}, \texttt{CholeraMap}, \texttt{MetricBreakdownModal}, and chart components (e.g.\ \texttt{ConfirmedPositivityTrend}, \texttt{MonthlySuspectedChart}, \texttt{SeasonalityChart}, \texttt{CfrTrendChart}, \texttt{RegionDistributionChart}, \texttt{SuspectedVsConfirmedChart}). Weather-specific components (e.g.\ \texttt{WeatherAlerts}, \texttt{WeatherImpactAnalysis}, \texttt{WeatherThreatsList}, \texttt{RecentWeatherAnomalies}) are used only on the Weather page. Data transformations and aggregations live in \texttt{utils/dataTransforms.js} and are used by \texttt{App.jsx} and occasionally by pages or components.
+
+\newpage
+
+%==============================================================================
+\section{Backend API and Deployment Notes}
+%==============================================================================
+
+\subsection{XGBoost Prediction API}
+
+The Python API loads a single XGBoost model from \texttt{xgboost\_model.joblib}. It builds a feature vector from the request body (e.g.\ historical suspected cases, date, region, district, and one-hot or derived features matching the model’s \texttt{feature\_names\_in\_}). The model output (e.g.\ shape \texttt{(1, 2)}) is interpreted and returned as predicted suspected cases for the requested horizon. The API is stateless and does not call Supabase; the frontend is responsible for sending the correct context from its filtered Supabase data.
+
+\subsection{Environment and Build}
+
+\begin{itemize}[noitemsep]
+    \item Frontend: \texttt{npm run dev} (Vite dev server, e.g.\ port 5173) and \texttt{npm run build} for production. Optional deploy targets include GitHub Pages and Vercel.
+    \item Backend: Run the Flask app (e.g.\ \texttt{python api/xgboost\_predict.py} or via a WSGI server) on the port configured in the frontend env (e.g.\ \texttt{VITE\_XGBOOST\_API\_URL} or \texttt{VITE\_LSTM\_API\_URL}).
+    \item Supabase: Configure URL and anon key in the frontend; enable Realtime for \texttt{cholera\_reports} if instant updates are desired; apply RLS migrations as needed (e.g.\ restrict INSERT/UPDATE to authenticated users).
+\end{itemize}
+
+\subsection{Security and Data Freshness}
+
+Row Level Security on \texttt{cholera\_reports} should limit who can insert or update rows (e.g.\ authenticated role only). The frontend uses the anon key for reads and (if allowed by RLS) for Data Admin writes; for production, admin writes should go through an authenticated session or a backend using the service role. Data freshness is achieved by Supabase Realtime plus a 30-second polling fallback and by passing \texttt{lastUpdatedAt} into the map so the GeoJSON layer is refreshed whenever the cholera dataset is refetched.
+
+%==============================================================================
+\section{Summary}
+%==============================================================================
+
+Cholera Watch is a React-based health intelligence dashboard backed by Supabase for cholera surveillance data. It supports real-time updates via Realtime and polling, client-side filtering by date and location, and a rich set of analytics and visualisations (charts, map, weather, and threats). An optional Python/Flask XGBoost API provides 14-day forecasts when the frontend sends historical and context data in the request body. The frontend is structured around a single data hook and centralised filtering and derivation in \texttt{App.jsx}, with a responsive layout (sidebar on desktop, top nav on mobile) and consistent use of \texttt{lastUpdatedAt} to keep the map and indicators in sync with the database.
+
+\end{document}

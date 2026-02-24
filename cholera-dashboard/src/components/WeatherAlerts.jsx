@@ -143,8 +143,8 @@ function WeatherAlerts({ onLocationChange }) {
       transition={{ duration: 0.6, ease: 'easeOut' }}
     >
       <div className="carousel-header">
-        <h3>Weather Conditions Across Districts</h3>
-        <p>Real-time weather monitoring with automatic alerts</p>
+        <h3>Climate & Weather Risk Monitor</h3>
+        <p>District-level conditions and alerts that can amplify cholera risk</p>
       </div>
 
       <div className="weather-carousel-wrapper">

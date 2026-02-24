@@ -35,8 +35,9 @@ function EarlyWarning({ loading, error, earlyWarning, filteredData, summary }) {
           <p className="eyebrow">Early warning & forecasting</p>
           <h1>Alert thresholds & anomaly detection</h1>
           <p className="lede">
-            Monitor alert conditions, rolling averages, and trend-based forecasts
-            derived from the 2011–2024 analytics window.
+            Monitor alert conditions, rolling averages, and AI-powered
+            short-term forecasts that combine surveillance trends with weather
+            signals.
           </p>
         </div>
       </motion.section>
@@ -81,13 +82,6 @@ function EarlyWarning({ loading, error, earlyWarning, filteredData, summary }) {
 
       <WeatherThreatsList />
 
-      {filteredData && filteredData.length > 0 && (
-        <LSTMForecast
-          historicalData={filteredData}
-          region={summary?.topRegion || 'Central'}
-        />
-      )}
-
       <section className="grid chart-grid">
         <motion.article
           className="chart-card"
@@ -119,27 +113,11 @@ function EarlyWarning({ loading, error, earlyWarning, filteredData, summary }) {
 
       </section>
 
-      {forecast.length > 0 && (
-        <motion.section
-          className="chart-card"
-          initial={{ opacity: 0, y: 24 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, amount: 0.2 }}
-          transition={{ duration: 0.6, ease: 'easeOut' }}
-        >
-          <div className="section-header">
-            <h3>Short-term forecast (Trend-based)</h3>
-            <p>Projected confirmed cases using recent growth momentum.</p>
-          </div>
-          <div className="insight-cards">
-            {forecast.map((entry) => (
-              <div key={entry.label} className="insight-card">
-                <p>{entry.label}</p>
-                <strong>{entry.confirmed.toLocaleString()}</strong>
-              </div>
-            ))}
-          </div>
-        </motion.section>
+      {filteredData && filteredData.length > 0 && (
+        <LSTMForecast
+          historicalData={filteredData}
+          region={summary?.topRegion || 'Central'}
+        />
       )}
     </div>
   )

@@ -10,8 +10,6 @@ import {
   Legend,
 } from 'recharts'
 import { motion } from 'framer-motion'
-import LSTMForecast from '../components/LSTMForecast'
-
 function ResponseInsights({ loading, error, spreadInsights, filteredData, summary }) {
   if (loading) {
     return <p className="status-text">Loading dataset…</p>
@@ -28,7 +26,6 @@ function ResponseInsights({ loading, error, spreadInsights, filteredData, summar
     responseIndicators = {},
     riskRegions = [],
     vulnerablePopulations = [],
-    transmissionPatterns = [],
   } = spreadInsights || {}
 
   return (
@@ -116,8 +113,14 @@ function ResponseInsights({ loading, error, spreadInsights, filteredData, summar
           transition={{ duration: 0.6, ease: 'easeOut' }}
         >
           <div className="section-header">
-            <h3>Outbreak threshold monitoring</h3>
-            <p>Monthly points above the adaptive threshold ({outbreakThreshold.toLocaleString()} cCh).</p>
+            <div>
+              <h3>Outbreak threshold monitoring (AI‑assisted)</h3>
+              <p>
+                Monthly exceedances of the adaptive confirmed‑case threshold
+                ({outbreakThreshold.toLocaleString()} cCh) with upcoming risk
+                inferred from the AI forecast.
+              </p>
+            </div>
           </div>
           <ul className="list-grid">
             {outbreakFlags.length ? (
@@ -226,49 +229,6 @@ function ResponseInsights({ loading, error, spreadInsights, filteredData, summar
           </ul>
         </motion.article>
 
-        <motion.article
-          className="chart-card"
-          initial={{ opacity: 0, y: 24 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, amount: 0.2 }}
-          transition={{ duration: 0.6, ease: 'easeOut' }}
-        >
-          <div className="section-header">
-            <h3>Transmission pattern analysis</h3>
-            <p>Exposure gaps (sCh - cCh) and efficiency ratios.</p>
-          </div>
-          <ResponsiveContainer width="100%" height={300}>
-            <ComposedChart data={transmissionPatterns}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="label" minTickGap={28} />
-              <YAxis yAxisId="left" />
-              <YAxis
-                yAxisId="right"
-                orientation="right"
-                tickFormatter={(value) => `${(value * 100).toFixed(0)}%`}
-              />
-              <Tooltip />
-              <Area
-                yAxisId="left"
-                type="monotone"
-                dataKey="exposureGap"
-                name="Exposure gap"
-                stroke="#1d4ed8"
-                fill="#93c5fd"
-                fillOpacity={0.3}
-              />
-              <Line
-                yAxisId="right"
-                type="monotone"
-                dataKey="efficiencyRatio"
-                name="Efficiency ratio"
-                stroke="#7c3aed"
-                strokeWidth={2}
-                dot={false}
-              />
-            </ComposedChart>
-          </ResponsiveContainer>
-        </motion.article>
       </section>
     </div>
   )
