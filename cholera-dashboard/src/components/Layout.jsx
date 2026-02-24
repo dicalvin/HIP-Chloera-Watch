@@ -2,37 +2,140 @@ import { useState, useEffect } from 'react'
 import { NavLink } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 
-function Layout({ children, loading, summary }) {
+function formatLiveAgo(date) {
+  if (!date || !(date instanceof Date) || Number.isNaN(date.valueOf())) return null
+  const sec = Math.floor((Date.now() - date.getTime()) / 1000)
+  if (sec < 10) return 'Just now'
+  if (sec < 60) return `${sec}s ago`
+  const min = Math.floor(sec / 60)
+  if (min < 60) return `${min}m ago`
+  const h = Math.floor(min / 60)
+  return `${h}h ago`
+}
+
+const navLinks = [
+  { to: '/', label: 'Overview', end: true, icon: 'overview' },
+  { to: '/analytics', label: 'Analytics & Filters', end: false, icon: 'analytics' },
+  { to: '/response-insights', label: 'Response Insights', end: false, icon: 'insights' },
+  { to: '/early-warning', label: 'Early Warning', end: false, icon: 'warning' },
+  { to: '/weather', label: 'Weather', end: false, icon: 'weather' },
+  { to: '/resource-planning', label: 'Resource Planning', end: false, icon: 'planning' },
+]
+
+const icons = {
+  overview: (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="3" width="7" height="7" rx="1" />
+      <rect x="3" y="14" width="7" height="7" rx="1" />
+      <rect x="14" y="14" width="7" height="7" rx="1" />
+    </svg>
+  ),
+  analytics: (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <line x1="18" y1="20" x2="18" y2="10" />
+      <line x1="12" y1="20" x2="12" y2="4" />
+      <line x1="6" y1="20" x2="6" y2="14" />
+    </svg>
+  ),
+  insights: (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+      <line x1="16" y1="13" x2="8" y2="13" />
+      <line x1="16" y1="17" x2="8" y2="17" />
+      <polyline points="10 9 9 9 8 9" />
+    </svg>
+  ),
+  warning: (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+      <line x1="12" y1="9" x2="12" y2="13" />
+      <line x1="12" y1="17" x2="12.01" y2="17" />
+    </svg>
+  ),
+  weather: (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="5" />
+      <line x1="12" y1="1" x2="12" y2="3" />
+      <line x1="12" y1="21" x2="12" y2="23" />
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+      <line x1="1" y1="12" x2="3" y2="12" />
+      <line x1="21" y1="12" x2="23" y2="12" />
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+    </svg>
+  ),
+  planning: (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+      <line x1="16" y1="2" x2="16" y2="6" />
+      <line x1="8" y1="2" x2="8" y2="6" />
+      <line x1="3" y1="10" x2="21" y2="10" />
+    </svg>
+  ),
+}
+
+function Layout({ children, loading, summary, lastUpdatedAt }) {
   const totals = summary || { totalReports: 0, totalConfirmed: 0 }
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [isMobile, setIsMobile] = useState(false)
+  const [isDesktop, setIsDesktop] = useState(true)
+  const [liveLabel, setLiveLabel] = useState(() => formatLiveAgo(lastUpdatedAt))
 
   useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth <= 768)
-    }
-    checkMobile()
-    window.addEventListener('resize', checkMobile)
-    return () => window.removeEventListener('resize', checkMobile)
+    setLiveLabel(formatLiveAgo(lastUpdatedAt))
+    const t = setInterval(() => setLiveLabel(formatLiveAgo(lastUpdatedAt)), 15_000)
+    return () => clearInterval(t)
+  }, [lastUpdatedAt])
+
+  useEffect(() => {
+    const check = () => setIsDesktop(window.innerWidth >= 1024)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
   }, [])
 
-  const navLinks = [
-    { to: '/', label: 'Overview', end: true },
-    { to: '/analytics', label: 'Analytics & Filters' },
-    { to: '/response-insights', label: 'Response Insights' },
-    { to: '/early-warning', label: 'Early Warning' },
-    { to: '/weather', label: 'Weather' },
-    { to: '/resource-planning', label: 'Resource Planning' },
-  ]
-
   return (
-    <div className="app-shell">
-      <motion.nav
-        className="top-nav"
-        initial={{ opacity: 0, y: -16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, ease: 'easeOut' }}
-      >
+    <div className={`app-shell ${isDesktop ? 'app-shell--sidebar' : ''}`}>
+      <aside className="sidebar">
+        <div className="sidebar__brand">
+          <span className="sidebar__brand-primary">Health Intelligence</span>
+          <strong className="sidebar__brand-accent">Platform</strong>
+          <small className="sidebar__brand-tag">Cholera Watch</small>
+        </div>
+        <nav className="sidebar__nav" aria-label="Main navigation">
+          {navLinks.map((link) => (
+            <NavLink
+              key={link.to}
+              to={link.to}
+              end={link.end}
+              className={({ isActive }) =>
+                `sidebar__link ${isActive ? 'sidebar__link--active' : ''}`
+              }
+            >
+              <span className="sidebar__icon">{icons[link.icon]}</span>
+              <span className="sidebar__label">{link.label}</span>
+            </NavLink>
+          ))}
+        </nav>
+        <div className="sidebar__meta">
+          {loading ? (
+            <span>Loading data…</span>
+          ) : (
+            <>
+              <span className="sidebar__live">
+                <span className="sidebar__live-dot" aria-hidden="true" /> Data live
+                {liveLabel && <span className="sidebar__live-ago"> · {liveLabel}</span>}
+              </span>
+              <span>{totals.totalReports.toLocaleString()} reports</span>
+              <span>{totals.totalConfirmed.toLocaleString()} confirmed</span>
+            </>
+          )}
+        </div>
+      </aside>
+
+      <div className="top-nav top-nav--mobile">
         <div className="brand">
           <div className="brand-primary">
             <span>Health Intelligence</span>
@@ -45,18 +148,20 @@ function Layout({ children, loading, summary }) {
           className="mobile-menu-toggle"
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           aria-label="Toggle menu"
+          aria-expanded={mobileMenuOpen}
         >
           <span className={mobileMenuOpen ? 'open' : ''} />
           <span className={mobileMenuOpen ? 'open' : ''} />
           <span className={mobileMenuOpen ? 'open' : ''} />
         </button>
         <AnimatePresence>
-          {(!isMobile || mobileMenuOpen) && (
+          {mobileMenuOpen && (
             <motion.div
-              className="nav-links"
-              initial={isMobile ? { opacity: 0, height: 0 } : false}
-              animate={isMobile ? { opacity: 1, height: 'auto' } : {}}
-              exit={isMobile ? { opacity: 0, height: 0 } : {}}
+              className="nav-links nav-links--mobile"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2 }}
             >
               {navLinks.map((link) => (
                 <NavLink
@@ -64,28 +169,36 @@ function Layout({ children, loading, summary }) {
                   to={link.to}
                   end={link.end}
                   onClick={() => setMobileMenuOpen(false)}
+                  className={({ isActive }) =>
+                    `nav-link-with-icon ${isActive ? 'active' : ''}`
+                  }
                 >
+                  <span className="nav-link-icon">{icons[link.icon]}</span>
                   {link.label}
                 </NavLink>
               ))}
             </motion.div>
           )}
         </AnimatePresence>
-        <div className="nav-meta">
+        <div className="nav-meta nav-meta--mobile">
           {loading ? (
-            <span>Loading data…</span>
+            <span>Loading…</span>
           ) : (
             <>
+              <span className="sidebar__live">
+                <span className="sidebar__live-dot" aria-hidden="true" /> Live
+                {liveLabel && <span className="sidebar__live-ago"> {liveLabel}</span>}
+              </span>
               <span>{totals.totalReports.toLocaleString()} reports</span>
-              <span>{totals.totalConfirmed.toLocaleString()} confirmed cases</span>
+              <span>{totals.totalConfirmed.toLocaleString()} confirmed</span>
             </>
           )}
         </div>
-      </motion.nav>
-      <main>{children}</main>
+      </div>
+
+      <main className="main-content">{children}</main>
     </div>
   )
 }
 
 export default Layout
-

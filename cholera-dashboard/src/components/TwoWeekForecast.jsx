@@ -261,8 +261,8 @@ function TwoWeekForecast({ location = 'kampala' }) {
         transition={{ duration: 0.6, ease: 'easeOut' }}
       >
         <div className="section-header">
-          <h3>14-Day Weather Forecast & Disease Impact Analysis</h3>
-          <p>Loading extended forecast data...</p>
+          <h3>14-Day Temperature Forecast</h3>
+          <p>Loading forecast data…</p>
         </div>
         <div className="status-text">Loading forecast...</div>
       </motion.section>
@@ -279,7 +279,7 @@ function TwoWeekForecast({ location = 'kampala' }) {
         transition={{ duration: 0.6, ease: 'easeOut' }}
       >
         <div className="section-header">
-          <h3>14-Day Weather Forecast & Disease Impact Analysis</h3>
+          <h3>14-Day Temperature Forecast</h3>
         </div>
         <div className="status-text error">{error}</div>
       </motion.section>
@@ -302,11 +302,7 @@ function TwoWeekForecast({ location = 'kampala' }) {
     >
       <div className="section-header">
         <div>
-          <h3>14-Day Weather Forecast & Disease Impact Analysis</h3>
-          <p>
-            Extended forecast for {locationName} with extreme weather condition alerts that
-            could impact cholera spread and water quality.
-          </p>
+          <h3>14-Day Temperature Forecast — {locationName}</h3>
         </div>
         {extremeAlerts.length > 0 && (
           <div className="forecast-alert-summary">
@@ -367,33 +363,6 @@ function TwoWeekForecast({ location = 'kampala' }) {
               stroke="#3b82f6"
               strokeWidth={2}
               dot={{ r: 4 }}
-            />
-          </AreaChart>
-        </ResponsiveContainer>
-      </div>
-
-      {/* Precipitation Chart */}
-      <div className="forecast-chart-container">
-        <h4>Precipitation Forecast (14 Days)</h4>
-        <ResponsiveContainer width="100%" height={250}>
-          <AreaChart data={chartData}>
-            <defs>
-              <linearGradient id="precipGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4} />
-                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="label" minTickGap={2} />
-            <YAxis label={{ value: 'Precipitation (mm)', angle: -90, position: 'insideLeft' }} />
-            <Tooltip formatter={(value) => [`${value.toFixed(1)}mm`, 'Rainfall']} />
-            <Area
-              type="monotone"
-              dataKey="precip"
-              name="Rainfall"
-              stroke="#3b82f6"
-              fill="url(#precipGradient)"
-              strokeWidth={2}
             />
           </AreaChart>
         </ResponsiveContainer>

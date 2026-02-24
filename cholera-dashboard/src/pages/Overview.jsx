@@ -14,6 +14,7 @@ function Overview({
   geoError,
   dateRange,
   breakdowns,
+  dataUpdatedAt,
 }) {
   const [activeMetric, setActiveMetric] = useState(null)
 
@@ -50,6 +51,7 @@ function Overview({
             districtStats={districtStats}
             geoError={geoError}
             dateRange={dateRange}
+            dataUpdatedAt={dataUpdatedAt}
           />
 
           <motion.section

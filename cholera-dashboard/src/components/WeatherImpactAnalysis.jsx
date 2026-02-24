@@ -33,7 +33,7 @@ const getWeatherEmoji = (weatherText, temp) => {
   return '🌤️'
 }
 
-function WeatherImpactAnalysis({ onDistrictClick }) {
+function WeatherImpactAnalysis() {
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [isPaused, setIsPaused] = useState(false)
   const autoRotateRef = useRef(null)
@@ -87,14 +87,6 @@ function WeatherImpactAnalysis({ onDistrictClick }) {
     setTimeout(() => {
       setIsPaused(false)
     }, 10000)
-  }
-
-  // Handle card click to open modal immediately
-  const handleCardClick = (index) => {
-    if (onDistrictClick) {
-      // Immediately trigger the modal
-      onDistrictClick(LOCATION_KEYS[index])
-    }
   }
 
   // Analyze weather impact on response effectiveness
@@ -283,10 +275,7 @@ function WeatherImpactAnalysis({ onDistrictClick }) {
               <motion.div
                 key={locationKey}
                 className={`weather-card ${isActive ? 'active' : ''}`}
-                onClick={() => {
-                  handleLocationSelect(index)
-                  handleCardClick(index)
-                }}
+                onClick={() => handleLocationSelect(index)}
                 initial={false}
                 animate={{
                   scale: isActive ? 1.05 : 0.95,
@@ -456,21 +445,14 @@ function WeatherImpactAnalysis({ onDistrictClick }) {
                     <p className="impact-description">{impact.description}</p>
                   </motion.div>
                 ))}
-                <div className="view-details-prompt">
-                  <p>
-                    <strong>Tap the district card above</strong> to view detailed 14-day forecast,
-                    comprehensive impact analysis, and actionable recommendations.
-                  </p>
-                </div>
               </div>
             ) : (
               <div className="weather-status-ok">
                 <span className="status-icon">✅</span>
                 <div>
-                  <strong>Favorable Current Conditions</strong>
+                  <strong>Favorable current conditions</strong>
                   <p>
-                    Current weather conditions are favorable for {UGANDA_LOCATIONS[selectedLocation].name}.
-                    Tap the district card above to view the 14-day forecast and detailed analysis.
+                    Current weather in {UGANDA_LOCATIONS[selectedLocation].name} is within normal range for response planning.
                   </p>
                 </div>
               </div>
