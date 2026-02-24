@@ -25,7 +25,15 @@ _CHOLERA_ROOT = os.path.dirname(_CHOLERA_DASHBOARD)
 
 
 def _find_model_path():
-    bases = [_CHOLERA_ROOT, _CHOLERA_DASHBOARD]
+    """
+    Try to locate xgboost_model.joblib in a few common places.
+    Priority:
+      1. Same folder as this file (works well for Vercel / other deployments)
+      2. cholera-dashboard root
+      3. Cholera project root
+      4. Current working directory and its parent
+    """
+    bases = [_API_DIR, _CHOLERA_DASHBOARD, _CHOLERA_ROOT]
     try:
         cwd = os.getcwd()
         bases.extend([cwd, os.path.dirname(cwd)])

@@ -1,7 +1,17 @@
 import { useState, useEffect, useCallback } from 'react'
 
-// API URL: use VITE_XGBOOST_API_URL or VITE_LSTM_API_URL (legacy), default localhost
-const API_URL = import.meta.env.VITE_XGBOOST_API_URL || import.meta.env.VITE_LSTM_API_URL || 'http://localhost:5001'
+// Decide API base URL:
+// - Prefer explicit env vars (works for deployed site)
+// - Fallback to localhost:5001 ONLY during local development
+// - On a deployed site with no env var, leave blank and show a helpful message
+const explicitApiUrl =
+  import.meta.env.VITE_XGBOOST_API_URL || import.meta.env.VITE_LSTM_API_URL
+
+const API_URL =
+  explicitApiUrl ||
+  (typeof window !== 'undefined' && window.location.hostname === 'localhost'
+    ? 'http://localhost:5001'
+    : '')
 
 /**
  * Hook for XGBoost prediction API (predict & forecast).
@@ -12,6 +22,12 @@ export function useXGBoostPredictions() {
   const [modelAvailable, setModelAvailable] = useState(false)
 
   useEffect(() => {
+    // In production with no configured API URL, don't spam failing requests
+    if (!API_URL) {
+      setModelAvailable(false)
+      return
+    }
+
     const checkModel = async () => {
       try {
         const response = await fetch(`${API_URL}/health`, {
@@ -39,6 +55,15 @@ export function useXGBoostPredictions() {
   const getPrediction = useCallback(async (predictionData) => {
     setLoading(true)
     setError(null)
+
+    if (!API_URL) {
+      setLoading(false)
+      setError(
+        'Prediction API is not configured for this deployment. Please set VITE_XGBOOST_API_URL to a publicly reachable XGBoost API URL.',
+      )
+      return null
+    }
+
     try {
       const response = await fetch(`${API_URL}/api/lstm/predict`, {
         method: 'POST',
@@ -61,6 +86,15 @@ export function useXGBoostPredictions() {
   const getForecast = useCallback(async (forecastData, steps = 7) => {
     setLoading(true)
     setError(null)
+
+    if (!API_URL) {
+      setLoading(false)
+      setError(
+        'Forecast API is not configured for this deployment. Please set VITE_XGBOOST_API_URL to a publicly reachable XGBoost API URL.',
+      )
+      return null
+    }
+
     try {
       const response = await fetch(`${API_URL}/api/lstm/forecast`, {
         method: 'POST',

@@ -41,6 +41,8 @@ const parseRow = (row, idx) => {
 }
 
 const POLL_INTERVAL_MS = 30_000 // 30s fallback when Realtime is unavailable
+const MAX_RETRIES = 4
+const RETRY_DELAYS_MS = [1000, 3000, 6000, 15000]
 
 function useCholeraData() {
   const [data, setData] = useState([])
@@ -50,7 +52,7 @@ function useCholeraData() {
   const [maxDate, setMaxDate] = useState(null)
   const [lastUpdatedAt, setLastUpdatedAt] = useState(null)
 
-  const fetchData = async () => {
+  const fetchData = async (isRetry = false) => {
     if (!isSupabaseConfigured || !supabase) {
       setError(
         'Supabase is not configured. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.',
@@ -59,52 +61,74 @@ function useCholeraData() {
       return
     }
 
-    try {
-      const { data: rows, error: supaError } = await supabase
-        .from('cholera_reports')
-        .select(
-          'id,index,location,tl,tr,deaths,sch,cch,cfr,reporting_date,source_index,source,confidence_weight,processing_notes,source_database,district,region',
-        )
+    const attempt = async (retryCount = 0) => {
+      try {
+        const { data: rows, error: supaError } = await supabase
+          .from('cholera_reports')
+          .select(
+            'id,index,location,tl,tr,deaths,sch,cch,cfr,reporting_date,source_index,source,confidence_weight,processing_notes,source_database,district,region',
+          )
 
-      if (supaError) {
-        console.error('Supabase query error:', supaError)
-        setError(supaError.message || 'Failed to load dataset from Supabase.')
+        if (supaError) {
+          if (retryCount < MAX_RETRIES) {
+            const delay = RETRY_DELAYS_MS[retryCount] ?? 15000
+            setTimeout(() => attempt(retryCount + 1), delay)
+            if (!isRetry) setError('Reconnecting…')
+            return
+          }
+          console.error('Supabase query error:', supaError)
+          setError(supaError.message || 'Failed to load dataset from Supabase.')
+          setLoading(false)
+          return
+        }
+
+        if (!rows || rows.length === 0) {
+          if (retryCount < MAX_RETRIES) {
+            const delay = RETRY_DELAYS_MS[retryCount] ?? 15000
+            setTimeout(() => attempt(retryCount + 1), delay)
+            return
+          }
+          setError('No records found in Supabase table cholera_reports.')
+          setLoading(false)
+          return
+        }
+
+        const parsedRows = rows.map(parseRow)
+        const validRows = parsedRows.filter((row) => row.reportingDate)
+
+        if (!validRows.length) {
+          setError(
+            'No dated records were found in the Supabase dataset. Check reporting_date values.',
+          )
+          setLoading(false)
+          return
+        }
+
+        const timestamps = validRows.map((row) => row.reportingDate.valueOf())
+        const min = new Date(Math.min(...timestamps))
+        const max = new Date(Math.max(...timestamps))
+
+        setMinDate(min)
+        setMaxDate(max)
+        setData(validRows)
+        setError('')
+        setLastUpdatedAt(new Date())
+      } catch (err) {
+        console.error('Unexpected Supabase fetch error:', err)
+        if (retryCount < MAX_RETRIES) {
+          const delay = RETRY_DELAYS_MS[retryCount] ?? 15000
+          setTimeout(() => attempt(retryCount + 1), delay)
+          if (!isRetry) setError('Reconnecting…')
+          return
+        }
+        setError(err.message || 'Failed to load dataset from Supabase.')
+        // Keep previous data so the UI does not go blank
+      } finally {
         setLoading(false)
-        return
       }
-
-      if (!rows || rows.length === 0) {
-        setError('No records found in Supabase table cholera_reports.')
-        setLoading(false)
-        return
-      }
-
-      const parsedRows = rows.map(parseRow)
-      const validRows = parsedRows.filter((row) => row.reportingDate)
-
-      if (!validRows.length) {
-        setError(
-          'No dated records were found in the Supabase dataset. Check reporting_date values.',
-        )
-        setLoading(false)
-        return
-      }
-
-      const timestamps = validRows.map((row) => row.reportingDate.valueOf())
-      const min = new Date(Math.min(...timestamps))
-      const max = new Date(Math.max(...timestamps))
-
-      setMinDate(min)
-      setMaxDate(max)
-      setData(validRows)
-      setError('')
-      setLastUpdatedAt(new Date())
-    } catch (err) {
-      console.error('Unexpected Supabase fetch error:', err)
-      setError(err.message || 'Failed to load dataset from Supabase.')
-    } finally {
-      setLoading(false)
     }
+
+    await attempt(0)
   }
 
   useEffect(() => {

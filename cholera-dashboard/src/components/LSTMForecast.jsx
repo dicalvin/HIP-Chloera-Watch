@@ -127,7 +127,10 @@ function LSTMForecast({ historicalData, region = 'Central', district = null }) {
           <strong>Error:</strong> {error}
           <br />
           <small style={{ marginTop: '0.5rem', display: 'block', opacity: 0.9 }}>
-            Ensure the XGBoost API is running at <code>http://localhost:5001</code> and <code>xgboost_model.joblib</code> is in the Cholera project folder.
+            If you are running locally, start the XGBoost API with{' '}
+            <code>cd cholera-dashboard/api &amp;&amp; python xgboost_predict.py</code>.
+            For the live site, deploy this API to a public URL (for example, on Render/Railway)
+            and set <code>VITE_XGBOOST_API_URL</code> to that URL before building.
           </small>
         </div>
       </motion.section>
@@ -153,7 +156,10 @@ function LSTMForecast({ historicalData, region = 'Central', district = null }) {
               <strong>Error:</strong> {error}
               <br />
               <small style={{ marginTop: '0.5rem', display: 'block' }}>
-                Run the XGBoost API from the project root: <code>cd cholera-dashboard/api && python xgboost_predict.py</code>. Ensure <code>xgboost_model.joblib</code> is in the Cholera folder.
+                Locally, run the XGBoost API with{' '}
+                <code>cd cholera-dashboard/api &amp;&amp; python xgboost_predict.py</code>. On the
+                deployed site, configure <code>VITE_XGBOOST_API_URL</code> to point to a hosted copy
+                of this API so forecasts can load.
               </small>
             </>
           ) : (
