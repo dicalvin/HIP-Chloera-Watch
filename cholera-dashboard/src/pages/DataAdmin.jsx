@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import Papa from 'papaparse'
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient'
+import { useAuth } from '../context/AuthContext'
 
 const EXPECTED_COLUMNS = [
   'Index',
@@ -47,6 +48,49 @@ function DataAdmin() {
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
   const [isUploading, setIsUploading] = useState(false)
+  const [users, setUsers] = useState([])
+  const [userError, setUserError] = useState('')
+  const [userLoading, setUserLoading] = useState(false)
+
+  const { user, profile } = useAuth()
+
+  const isAdmin =
+    !!profile && profile.status === 'approved' && profile.role === 'system_admin'
+
+  const loadUsers = async () => {
+    if (!isAdmin) return
+    setUserLoading(true)
+    setUserError('')
+    const { data, error: usersError } = await supabase
+      .from('user_profiles')
+      .select('id,email,full_name,role,status,created_at')
+      .order('created_at', { ascending: true })
+    setUserLoading(false)
+    if (usersError) {
+      setUserError(usersError.message)
+      return
+    }
+    setUsers(data || [])
+  }
+
+  useEffect(() => {
+    if (isAdmin) {
+      loadUsers()
+    }
+  }, [isAdmin])
+
+  const updateUser = async (id, changes) => {
+    setUserError('')
+    const { error: updateError } = await supabase
+      .from('user_profiles')
+      .update(changes)
+      .eq('id', id)
+    if (updateError) {
+      setUserError(updateError.message)
+      return
+    }
+    await loadUsers()
+  }
 
   const handleFileChange = async (event) => {
     const file = event.target.files?.[0]
@@ -149,6 +193,14 @@ function DataAdmin() {
 
   return (
     <div className="page">
+      {user && (
+        <p className="status-text" style={{ marginBottom: '0.75rem' }}>
+          Signed in as
+          {' '}
+          <strong>{user.email}</strong>
+          {profile && ` (${profile.role}, ${profile.status})`}
+        </p>
+      )}
       <motion.section
         className="hero secondary"
         initial={{ opacity: 0, y: 24 }}
@@ -159,60 +211,79 @@ function DataAdmin() {
           <p className="eyebrow">Data management</p>
           <h1>Cholera dataset administration</h1>
           <p className="lede">
-            Upload incremental CSV updates. The system validates the format and
-            upserts non-duplicate records into the Supabase{' '}
-            <code>cholera_reports</code> table using <code>index_csv</code> as
-            the unique key.
+            Review and manage user access to the Cholera Watch dashboard. Approve new accounts and
+            adjust roles for data entry, surveillance, and administration.
           </p>
         </div>
       </motion.section>
 
-      <section className="chart-card">
-        <div className="section-header">
-          <h3>Upload CSV updates</h3>
-          <p>
-            Ensure your CSV has the exact columns:
-            {' '}
-            {EXPECTED_COLUMNS.join(', ')}
-            .
-          </p>
-        </div>
+      {isAdmin && (
+        <section className="chart-card">
+          <div className="section-header">
+            <h3>User access management</h3>
+            <p>Review new signups, approve or decline access, and adjust roles.</p>
+          </div>
 
-        <div className="form-grid">
-          <label htmlFor="csv-upload" className="button primary">
-            {isUploading ? 'Uploading…' : 'Choose CSV file'}
-            <input
-              id="csv-upload"
-              type="file"
-              accept=".csv,text/csv"
-              onChange={handleFileChange}
-              disabled={isUploading}
-              style={{ display: 'none' }}
-            />
-          </label>
-        </div>
+          {userLoading ? (
+            <p className="status-text">Loading users…</p>
+          ) : (
+            <div className="data-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Email</th>
+                    <th>Name</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.map((u) => (
+                    <tr key={u.id}>
+                      <td>{u.email}</td>
+                      <td>{u.full_name || '-'}</td>
+                      <td>
+                        <select
+                          value={u.role}
+                          onChange={(e) => updateUser(u.id, { role: e.target.value })}
+                        >
+                          <option value="data_entry">Data Entry</option>
+                          <option value="epidemiologist">Epidemiologist</option>
+                          <option value="surveillance">Surveillance</option>
+                          <option value="data_manager">Data Manager</option>
+                          <option value="system_admin">System Admin</option>
+                        </select>
+                      </td>
+                      <td>{u.status}</td>
+                      <td>
+                        <div className="button-row">
+                          <button
+                            type="button"
+                            className="button small"
+                            onClick={() => updateUser(u.id, { status: 'approved' })}
+                          >
+                            Approve
+                          </button>
+                          <button
+                            type="button"
+                            className="button small secondary"
+                            onClick={() => updateUser(u.id, { status: 'rejected' })}
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
-        {status && <p className="status-text">{status}</p>}
-        {error && <p className="status-text error">{error}</p>}
-
-        {!isSupabaseConfigured && (
-          <p className="status-text error">
-            Supabase is not configured. Add
-            {' '}
-            <code>VITE_SUPABASE_URL</code>
-            {' '}
-            and
-            {' '}
-            <code>VITE_SUPABASE_ANON_KEY</code>
-            {' '}
-            to your
-            {' '}
-            <code>.env</code>
-            {' '}
-            file and restart the dev server.
-          </p>
-        )}
-      </section>
+          {userError && <p className="status-text error">{userError}</p>}
+        </section>
+      )}
     </div>
   )
 }

@@ -1,6 +1,4 @@
 import { motion } from 'framer-motion'
-import WeatherAlerts from '../components/WeatherAlerts'
-import WeatherImpactAnalysis from '../components/WeatherImpactAnalysis'
 import WeatherThreatsList from '../components/WeatherThreatsList'
 import RecentWeatherAnomalies from '../components/RecentWeatherAnomalies'
 
@@ -17,21 +15,12 @@ function Weather() {
           <p className="eyebrow">Weather monitoring</p>
           <h1>Real-time weather & risk</h1>
           <p className="lede">
-            Monitor current conditions, weather threats, and
-            weather-related cholera risk across districts.
+            Track key weather threats and recent anomalies that could affect cholera risk.
           </p>
         </div>
       </motion.section>
 
-      <section className="weather-page-sections">
-        <div className="weather-section weather-section--alerts">
-          <WeatherAlerts />
-        </div>
-
-        <div className="weather-section weather-section--impact">
-          <WeatherImpactAnalysis />
-        </div>
-
+      <section className="weather-page-sections weather-page-sections--simplified">
         <div className="weather-section weather-section--threats">
           <WeatherThreatsList />
         </div>

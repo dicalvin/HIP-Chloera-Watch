@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { NavLink } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useAuth } from '../context/AuthContext'
 
 function formatLiveAgo(date) {
   if (!date || !(date instanceof Date) || Number.isNaN(date.valueOf())) return null
@@ -75,6 +76,12 @@ const icons = {
       <line x1="3" y1="10" x2="21" y2="10" />
     </svg>
   ),
+  admin: (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 8 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 3.6 15a1.65 1.65 0 0 0-1.51-1H2a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 3.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 8 3.6a1.65 1.65 0 0 0 1-1.51V2a2 2 0 0 1 4 0v.09A1.65 1.65 0 0 0 16 3.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.19.53.19 1.11 0 1.64A1.65 1.65 0 0 0 20.91 12H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    </svg>
+  ),
 }
 
 function Layout({ children, loading, summary, lastUpdatedAt }) {
@@ -82,6 +89,9 @@ function Layout({ children, loading, summary, lastUpdatedAt }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [isDesktop, setIsDesktop] = useState(true)
   const [liveLabel, setLiveLabel] = useState(() => formatLiveAgo(lastUpdatedAt))
+  const { profile } = useAuth() || {}
+  const isAdmin =
+    !!profile && profile.status === 'approved' && profile.role === 'system_admin'
 
   useEffect(() => {
     setLiveLabel(formatLiveAgo(lastUpdatedAt))
@@ -118,6 +128,22 @@ function Layout({ children, loading, summary, lastUpdatedAt }) {
               <span className="sidebar__label">{link.label}</span>
             </NavLink>
           ))}
+          {isAdmin && (
+            <>
+              <div className="sidebar__admin-label">Admin</div>
+              <NavLink
+                to="/admin"
+                className={({ isActive }) =>
+                  `sidebar__link sidebar__link--admin ${
+                    isActive ? 'sidebar__link--active' : ''
+                  }`
+                }
+              >
+                <span className="sidebar__icon">{icons.admin}</span>
+                <span className="sidebar__label">Admin</span>
+              </NavLink>
+            </>
+          )}
         </nav>
         <div className="sidebar__meta">
           {loading ? (
@@ -177,6 +203,23 @@ function Layout({ children, loading, summary, lastUpdatedAt }) {
                   {link.label}
                 </NavLink>
               ))}
+              {isAdmin && (
+                <>
+                  <hr style={{ margin: '0.75rem 0', borderColor: '#e2e8f0' }} />
+                  <NavLink
+                    to="/admin"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={({ isActive }) =>
+                      `nav-link-with-icon nav-link-with-icon--admin ${
+                        isActive ? 'active' : ''
+                      }`
+                    }
+                  >
+                    <span className="nav-link-icon">{icons.admin}</span>
+                    Admin
+                  </NavLink>
+                </>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
