@@ -37,8 +37,8 @@ export function useXGBoostPredictions() {
         if (response.ok) {
           const data = await response.json()
           setModelAvailable(true)
-          if (data.model_type === 'XGBoost') {
-            console.log('XGBoost API available:', data)
+          if (data.model_type === 'XGBoost' || data.model_type === 'RandomForest') {
+            console.log('Prediction API available:', data.model_type, data)
           }
         } else {
           setModelAvailable(false)

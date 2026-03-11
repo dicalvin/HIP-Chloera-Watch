@@ -40,9 +40,7 @@ const parseRow = (row, idx) => {
   }
 }
 
-const POLL_INTERVAL_MS = 30_000 // 30s fallback when Realtime is unavailable
-const MAX_RETRIES = 4
-const RETRY_DELAYS_MS = [1000, 3000, 6000, 15000]
+const POLL_INTERVAL_MS = 30_000 // 30s polling
 
 function useCholeraData() {
   const [data, setData] = useState([])
@@ -51,129 +49,115 @@ function useCholeraData() {
   const [minDate, setMinDate] = useState(null)
   const [maxDate, setMaxDate] = useState(null)
   const [lastUpdatedAt, setLastUpdatedAt] = useState(null)
+  /** 'api' = data went through pipeline; 'supabase' = fallback direct from DB */
+  const [dataSource, setDataSource] = useState(null)
 
-  const fetchData = async (isRetry = false) => {
-    if (!isSupabaseConfigured || !supabase) {
-      setError(
-        'Supabase is not configured. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.',
+  const explicitApiUrl =
+    import.meta.env.VITE_XGBOOST_API_URL || import.meta.env.VITE_LSTM_API_URL
+
+  const API_URL =
+    explicitApiUrl ||
+    (typeof window !== 'undefined' && window.location.hostname === 'localhost'
+      ? 'http://localhost:5001'
+      : '')
+
+  const applyParsedRows = (rows) => {
+    const parsedRows = rows.map((row, idx) => parseRow(row, idx))
+    const validRows = parsedRows.filter((row) => row.reportingDate)
+    if (!validRows.length) return false
+    const timestamps = validRows.map((row) => row.reportingDate.valueOf())
+    setMinDate(new Date(Math.min(...timestamps)))
+    setMaxDate(new Date(Math.max(...timestamps)))
+    setData(validRows)
+    setError('')
+    setLastUpdatedAt(new Date())
+    return true
+  }
+
+  const fetchFromSupabase = async () => {
+    if (!isSupabaseConfigured || !supabase) return null
+    const { data: rows, error: supaError } = await supabase
+      .from('cholera_reports')
+      .select(
+        'id,index,location,tl,tr,deaths,sch,cch,cfr,reporting_date,source_index,source,confidence_weight,processing_notes,source_database,district,region',
       )
-      setLoading(false)
-      return
-    }
+    if (supaError || !rows || rows.length === 0) return null
+    return rows
+  }
 
-    const attempt = async (retryCount = 0) => {
+  const fetchData = async () => {
+    // 1) Try pipeline API first
+    if (API_URL) {
       try {
-        const { data: rows, error: supaError } = await supabase
-          .from('cholera_reports')
-          .select(
-            'id,index,location,tl,tr,deaths,sch,cch,cfr,reporting_date,source_index,source,confidence_weight,processing_notes,source_database,district,region',
-          )
-
-        if (supaError) {
-          if (retryCount < MAX_RETRIES) {
-            const delay = RETRY_DELAYS_MS[retryCount] ?? 15000
-            setTimeout(() => attempt(retryCount + 1), delay)
-            if (!isRetry) setError('Reconnecting…')
+        const response = await fetch(`${API_URL}/api/cholera-data`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+        })
+        if (response.ok) {
+          const payload = await response.json()
+          const rows = payload.data || []
+          if (rows.length > 0 && applyParsedRows(rows)) {
+            setDataSource('api')
+            setLoading(false)
             return
           }
-          console.error('Supabase query error:', supaError)
-          setError(supaError.message || 'Failed to load dataset from Supabase.')
-          setLoading(false)
-          return
         }
-
-        if (!rows || rows.length === 0) {
-          if (retryCount < MAX_RETRIES) {
-            const delay = RETRY_DELAYS_MS[retryCount] ?? 15000
-            setTimeout(() => attempt(retryCount + 1), delay)
-            return
-          }
-          setError('No records found in Supabase table cholera_reports.')
-          setLoading(false)
-          return
-        }
-
-        const parsedRows = rows.map(parseRow)
-        const validRows = parsedRows.filter((row) => row.reportingDate)
-
-        if (!validRows.length) {
-          setError(
-            'No dated records were found in the Supabase dataset. Check reporting_date values.',
-          )
-          setLoading(false)
-          return
-        }
-
-        const timestamps = validRows.map((row) => row.reportingDate.valueOf())
-        const min = new Date(Math.min(...timestamps))
-        const max = new Date(Math.max(...timestamps))
-
-        setMinDate(min)
-        setMaxDate(max)
-        setData(validRows)
-        setError('')
-        setLastUpdatedAt(new Date())
       } catch (err) {
-        console.error('Unexpected Supabase fetch error:', err)
-        if (retryCount < MAX_RETRIES) {
-          const delay = RETRY_DELAYS_MS[retryCount] ?? 15000
-          setTimeout(() => attempt(retryCount + 1), delay)
-          if (!isRetry) setError('Reconnecting…')
-          return
-        }
-        setError(err.message || 'Failed to load dataset from Supabase.')
-        // Keep previous data so the UI does not go blank
-      } finally {
-        setLoading(false)
+        console.warn('Cholera data API unreachable, trying Supabase:', err.message)
       }
     }
 
-    await attempt(0)
+    // 2) Fallback: load directly from Supabase so the app still works
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const rows = await fetchFromSupabase()
+        if (rows && applyParsedRows(rows)) {
+          setDataSource('supabase')
+          setError('') // Data loaded; use dataSource for optional notice
+          setLoading(false)
+          return
+        }
+      } catch (err) {
+        console.error('Supabase fallback failed:', err)
+      }
+    }
+
+    if (!API_URL) {
+      setError(
+        'Cholera data API is not configured. Set VITE_XGBOOST_API_URL to your backend URL, or ensure Supabase is configured.',
+      )
+    } else if (!isSupabaseConfigured || !supabase) {
+      setError(
+        'Could not reach the data API and Supabase is not configured. Start the backend (cd cholera-dashboard/api && python rf_predict.py) with SUPABASE_URL and SUPABASE_ANON_KEY set.',
+      )
+    } else {
+      setError(
+        'Failed to load data from the API and from Supabase. Check that the backend is running and Supabase credentials are valid.',
+      )
+    }
+    setLoading(false)
   }
 
   useEffect(() => {
     fetchData()
   }, [])
 
-  // Realtime: refetch when cholera_reports changes. Requires in Supabase:
-  // Database → Replication → add cholera_reports to supabase_realtime publication.
+  // Polling: refresh regularly so new rows appear
   useEffect(() => {
-    if (!isSupabaseConfigured || !supabase) return
-
-    const channel = supabase
-      .channel('cholera_reports_realtime')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'cholera_reports',
-        },
-        () => {
-          fetchData()
-        },
-      )
-      .subscribe((status) => {
-        if (status === 'CHANNEL_ERROR') {
-          console.warn(
-            '[Cholera] Realtime not available. Enable it in Supabase: Database → Replication → add cholera_reports to supabase_realtime. Polling will refresh data every 45s.',
-          )
-        }
-      })
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [])
-
-  // Polling fallback: refresh regularly so new rows appear even if Realtime isn't enabled
-  useEffect(() => {
-    if (!isSupabaseConfigured || !supabase) return
     const interval = setInterval(fetchData, POLL_INTERVAL_MS)
     return () => clearInterval(interval)
   }, [])
 
-  return { data, loading, error, minDate, maxDate, lastUpdatedAt, refetch: fetchData }
+  return {
+    data,
+    loading,
+    error,
+    minDate,
+    maxDate,
+    lastUpdatedAt,
+    dataSource, // 'api' | 'supabase' | null
+    refetch: fetchData,
+  }
 }
 
 export default useCholeraData

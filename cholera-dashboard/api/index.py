@@ -1,2 +1,2 @@
-from xgboost_predict import app
+from rf_predict import app
 

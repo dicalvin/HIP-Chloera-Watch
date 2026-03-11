@@ -21,7 +21,7 @@ After pushing to `main`, the GitHub Actions workflow will:
 
 ### Step 3: Deploy the API Separately
 
-The Flask API (`cholera-dashboard/api/rf_predict.py`) needs to be deployed separately since GitHub Pages only serves static files.
+The Flask API (`cholera-dashboard/api/rf_predict.py`, RF model + pipeline) must be deployed separately since GitHub Pages only serves static files.
 
 **Recommended Platforms:**
 - **Railway** (https://railway.app) - Easy setup, free tier available
@@ -33,7 +33,7 @@ The Flask API (`cholera-dashboard/api/rf_predict.py`) needs to be deployed separ
 2. New Project → Deploy from GitHub repo
 3. Select your repository
 4. Add service → Select `cholera-dashboard/api` folder
-5. Set start command: `python rf_predict.py`
+5. Set start command: `python rf_predict.py` (ensure `rf_model.joblib` and `feature_columns.joblib` are in the api folder or repo root)
 6. Add environment variables if needed
 7. Railway will provide a URL like: `https://your-api.railway.app`
 

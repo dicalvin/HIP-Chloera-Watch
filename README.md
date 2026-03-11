@@ -53,6 +53,7 @@ cd cholera-dashboard/api
 pip install -r requirements.txt
 python rf_predict.py
 ```
+The API uses the same **Random Forest** model and **CholeraPredictionPipeline** as batch (`cholera_pipeline.py`). Ensure `rf_model.joblib` and `feature_columns.joblib` are in the project root or in `cholera-dashboard/api/`.
 
 The API will run on `http://localhost:5001`
 
@@ -60,7 +61,8 @@ The API will run on `http://localhost:5001`
 
 Place these files in the root `Cholera` directory:
 - `cholera_data3.csv` - Main dataset
-- `random_forest_model.pkl` - Trained Random Forest model
+- `rf_model.joblib` - Trained Random Forest model
+- `feature_columns.joblib` - Feature column names (for pipeline)
 - `ug.json` - GeoJSON file for Uganda districts
 
 ## Project Structure
@@ -68,7 +70,8 @@ Place these files in the root `Cholera` directory:
 ```
 Cholera/
 ├── cholera_data3.csv          # Main dataset
-├── random_forest_model.pkl    # Random Forest model
+├── rf_model.joblib             # Random Forest model
+├── feature_columns.joblib      # Pipeline feature columns
 ├── ug.json                    # GeoJSON for Uganda
 ├── cholera-dashboard/
 │   ├── src/
@@ -77,7 +80,7 @@ Cholera/
 │   │   ├── hooks/             # Custom hooks
 │   │   └── utils/             # Utility functions
 │   ├── api/
-│   │   ├── rf_predict.py      # Random Forest API
+│   │   ├── rf_predict.py      # RF API (same model & pipeline as batch)
 │   │   └── requirements.txt   # Python dependencies
 │   └── public/                # Static assets
 └── METHODOLOGY.tex            # Methodology documentation
