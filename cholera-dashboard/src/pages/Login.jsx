@@ -7,7 +7,9 @@ function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
   const [loading, setLoading] = useState(false)
+  const [magicLoading, setMagicLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [rememberMe, setRememberMe] = useState(false)
   const navigate = useNavigate()
@@ -18,6 +20,7 @@ function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
+    setNotice('')
 
     if (!email || !password) {
       setError('Email and password are required.')
@@ -62,44 +65,61 @@ function Login() {
     navigate(from, { replace: true })
   }
 
-  const handleForgotPassword = () => {
-    // Implement password reset functionality
-    console.log('Forgot password clicked')
+  const handleForgotPassword = async () => {
+    setError('')
+    setNotice('')
+    if (!email) {
+      setError('Enter your email first so we can send a reset link.')
+      return
+    }
+    setLoading(true)
+    const redirectUrl = `${window.location.origin}/login`
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: redirectUrl,
+    })
+    setLoading(false)
+    if (resetError) {
+      // eslint-disable-next-line no-console
+      console.error('Supabase reset password error', resetError)
+      setError('Unable to send reset email. Please try again.')
+      return
+    }
+    setNotice('Password reset email sent. Check your inbox for the link.')
+  }
+
+  const handleMagicLink = async () => {
+    setError('')
+    setNotice('')
+    if (!email) {
+      setError('Enter your email to receive a magic sign-in link.')
+      return
+    }
+    setMagicLoading(true)
+    const redirectUrl = `${window.location.origin}/`
+    const { error: otpError } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: redirectUrl,
+      },
+    })
+    setMagicLoading(false)
+    if (otpError) {
+      // eslint-disable-next-line no-console
+      console.error('Supabase magic link error', otpError)
+      setError('Unable to send magic link. Please try again.')
+      return
+    }
+    setNotice('Magic sign-in link sent. Check your email to continue.')
   }
 
   return (
     <div className="page auth-page">
       <motion.div
-        className="auth-shell"
+        className="auth-shell auth-shell--centered"
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: 'easeOut' }}
       >
-        <div className="auth-hero">
-          <div className="auth-hero-inner">
-            <p className="eyebrow">Cholera Watch</p>
-            <h2 className="auth-hero-title">Secure access to disease intelligence</h2>
-            <p className="auth-hero-subtitle">
-              Sign in to manage cholera surveillance data, monitor outbreaks, and coordinate rapid
-              responses with AI-powered insights.
-            </p>
-            <div className="auth-hero-metrics">
-              <div className="auth-hero-pill">
-                <span>📊</span>
-                Live analytics
-              </div>
-              <div className="auth-hero-pill">
-                <span>🛰️</span>
-                Weather-linked risk
-              </div>
-              <div className="auth-hero-pill">
-                <span>🔐</span>
-                Role-based access
-              </div>
-            </div>
-          </div>
-        </div>
-
         <section className="auth-card chart-card">
           <div className="section-header">
             <h3>Welcome back</h3>
@@ -206,6 +226,12 @@ function Login() {
             </div>
           </form>
 
+          {notice && !error && (
+            <p style={{ marginTop: '1rem', fontSize: '0.85rem', color: '#15803d' }}>
+              {notice}
+            </p>
+          )}
+
           {/* Error Message */}
           {error && (
             <motion.div 
@@ -220,6 +246,18 @@ function Login() {
               </div>
             </motion.div>
           )}
+
+          <div className="magic-link-section">
+            <p className="magic-link-title">Prefer a one-time email link?</p>
+            <button
+              type="button"
+              className="button secondary magic-link-button"
+              onClick={handleMagicLink}
+              disabled={magicLoading || loading}
+            >
+              {magicLoading ? 'Sending magic link…' : 'Send magic sign-in link'}
+            </button>
+          </div>
 
           {/* Quick Tips */}
           <div className="quick-tips">
@@ -528,6 +566,39 @@ function Login() {
         .auth-footer {
           margin-top: 1.5rem;
           text-align: center;
+        }
+
+        .magic-link-section {
+          margin-top: 1.5rem;
+          padding-top: 1rem;
+          border-top: 1px solid #e2e8f0;
+          display: flex;
+          flex-direction: column;
+          gap: 0.5rem;
+        }
+
+        .magic-link-title {
+          margin: 0;
+          font-size: 0.85rem;
+          color: #64748b;
+          font-weight: 500;
+        }
+
+        .magic-link-button {
+          width: 100%;
+          padding: 0.75rem;
+          border-radius: 0.75rem;
+          border: 1px solid #cbd5f5;
+          background: linear-gradient(135deg, #eff6ff, #e0f2fe);
+          color: #1d4ed8;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .magic-link-button:hover:not(:disabled) {
+          box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+          transform: translateY(-1px);
         }
 
         .auth-footer-text {

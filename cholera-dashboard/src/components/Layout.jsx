@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { NavLink } from 'react-router-dom'
+import { useState, useEffect, useMemo } from 'react'
+import { NavLink, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../context/AuthContext'
 
@@ -89,9 +89,23 @@ function Layout({ children, loading, summary, lastUpdatedAt }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [isDesktop, setIsDesktop] = useState(true)
   const [liveLabel, setLiveLabel] = useState(() => formatLiveAgo(lastUpdatedAt))
-  const { profile } = useAuth() || {}
+  const { user, profile, signOut } = useAuth()
+  const navigate = useNavigate()
   const isAdmin =
     !!profile && profile.status === 'approved' && profile.role === 'system_admin'
+
+  const displayName = useMemo(() => {
+    const name = profile?.full_name?.trim()
+    if (name) return name
+    return 'User'
+  }, [profile])
+
+  const initials = useMemo(() => {
+    const base = (profile?.full_name || user?.email || 'U').trim()
+    const parts = base.split(/\s+/).filter(Boolean)
+    if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase()
+    return String(parts[0][0] || 'U').toUpperCase()
+  }, [profile, user])
 
   useEffect(() => {
     setLiveLabel(formatLiveAgo(lastUpdatedAt))
@@ -159,6 +173,32 @@ function Layout({ children, loading, summary, lastUpdatedAt }) {
             </>
           )}
         </div>
+
+        {user && (
+          <div className="sidebar__account">
+            <NavLink to="/profile" className="sidebar__account-link">
+              <span className="sidebar__avatar" aria-hidden="true">{initials}</span>
+              <span className="sidebar__account-text">
+                <span className="sidebar__account-name">{displayName}</span>
+                <span className="sidebar__account-role">{profile?.role || 'user'}</span>
+              </span>
+            </NavLink>
+            <button
+              type="button"
+              className="sidebar__logout"
+              onClick={async () => {
+                try {
+                  await signOut()
+                } finally {
+                  // Always redirect even if signOut fails/hangs
+                  window.location.assign('/login')
+                }
+              }}
+            >
+              Log out
+            </button>
+          </div>
+        )}
       </aside>
 
       <div className="top-nav top-nav--mobile">
@@ -169,17 +209,25 @@ function Layout({ children, loading, summary, lastUpdatedAt }) {
           </div>
           <small className="brand-secondary">Cholera Watch</small>
         </div>
-        <button
-          type="button"
-          className="mobile-menu-toggle"
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          aria-label="Toggle menu"
-          aria-expanded={mobileMenuOpen}
-        >
-          <span className={mobileMenuOpen ? 'open' : ''} />
-          <span className={mobileMenuOpen ? 'open' : ''} />
-          <span className={mobileMenuOpen ? 'open' : ''} />
-        </button>
+        <div className="top-nav__actions">
+          {user && (
+            <NavLink to="/profile" className="top-nav__profile">
+              <span className="top-nav__avatar" aria-hidden="true">{initials}</span>
+              <span className="top-nav__name">{displayName}</span>
+            </NavLink>
+          )}
+          <button
+            type="button"
+            className="mobile-menu-toggle"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label="Toggle menu"
+            aria-expanded={mobileMenuOpen}
+          >
+            <span className={mobileMenuOpen ? 'open' : ''} />
+            <span className={mobileMenuOpen ? 'open' : ''} />
+            <span className={mobileMenuOpen ? 'open' : ''} />
+          </button>
+        </div>
         <AnimatePresence>
           {mobileMenuOpen && (
             <motion.div

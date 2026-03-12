@@ -63,7 +63,7 @@ function DataAdmin() {
     setUserError('')
     const { data, error: usersError } = await supabase
       .from('user_profiles')
-      .select('id,email,full_name,role,status,created_at')
+      .select('id,email,first_name,last_name,full_name,phone,requested_role,role,status,created_at')
       .order('created_at', { ascending: true })
     setUserLoading(false)
     if (usersError) {
@@ -233,6 +233,8 @@ function DataAdmin() {
                   <tr>
                     <th>Email</th>
                     <th>Name</th>
+                    <th>Phone</th>
+                    <th>Requested</th>
                     <th>Role</th>
                     <th>Status</th>
                     <th>Actions</th>
@@ -243,8 +245,11 @@ function DataAdmin() {
                     <tr key={u.id}>
                       <td>{u.email}</td>
                       <td>{u.full_name || '-'}</td>
+                      <td>{u.phone || '-'}</td>
+                      <td>{u.requested_role || '-'}</td>
                       <td>
                         <select
+                          className="admin-role-select"
                           value={u.role}
                           onChange={(e) => updateUser(u.id, { role: e.target.value })}
                         >
@@ -260,14 +265,14 @@ function DataAdmin() {
                         <div className="button-row">
                           <button
                             type="button"
-                            className="button small"
+                            className="button small admin-action admin-action--primary"
                             onClick={() => updateUser(u.id, { status: 'approved' })}
                           >
                             Approve
                           </button>
                           <button
                             type="button"
-                            className="button small secondary"
+                            className="button small admin-action admin-action--secondary"
                             onClick={() => updateUser(u.id, { status: 'rejected' })}
                           >
                             Reject

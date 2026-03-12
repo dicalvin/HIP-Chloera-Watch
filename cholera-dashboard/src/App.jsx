@@ -9,9 +9,12 @@ import EarlyWarning from './pages/EarlyWarning'
 import ResourcePlanning from './pages/ResourcePlanning'
 import Weather from './pages/Weather'
 import DataAdmin from './pages/DataAdmin'
+import Profile from './pages/Profile'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
 import AdminLogin from './pages/AdminLogin'
+import Terms from './pages/Terms'
+import Privacy from './pages/Privacy'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import useCholeraData from './hooks/useCholeraData'
 import {
@@ -161,15 +164,19 @@ function InnerApp() {
   const isAuthPage =
     location.pathname === '/login' ||
     location.pathname === '/signup' ||
-    location.pathname === '/admin-login'
+    location.pathname === '/admin-login' ||
+    location.pathname === '/terms' ||
+    location.pathname === '/privacy'
 
   if (isAuthPage) {
-    // Auth pages: no Layout, just the forms
+    // Public pages: no Layout, no auth required
     return (
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/admin-login" element={<AdminLogin />} />
+        <Route path="/terms" element={<Terms />} />
+        <Route path="/privacy" element={<Privacy />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     )
@@ -274,6 +281,7 @@ function InnerApp() {
           )}
         />
         <Route path="/weather" element={<Weather />} />
+        <Route path="/profile" element={<Profile />} />
         <Route path="/data-admin" element={<DataAdmin />} />
         <Route path="/admin" element={<DataAdmin />} />
         <Route path="*" element={<Navigate to="/" replace />} />

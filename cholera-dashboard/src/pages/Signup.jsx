@@ -4,7 +4,10 @@ import { motion } from 'framer-motion'
 import { supabase } from '../lib/supabaseClient'
 
 function Signup() {
-  const [fullName, setFullName] = useState('')
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
+  const [requestedRole, setRequestedRole] = useState('data_entry')
+  const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -33,6 +36,11 @@ function Signup() {
     e.preventDefault()
     setError('')
     setStatus('')
+
+    if (!firstName.trim() || !lastName.trim()) {
+      setError('First name and last name are required.')
+      return
+    }
 
     if (!email || !password) {
       setError('Email and password are required.')
@@ -65,10 +73,15 @@ function Signup() {
     }
 
     if (data.user) {
+      const full_name = `${firstName.trim()} ${lastName.trim()}`.trim()
       const { error: profileError } = await supabase.from('user_profiles').insert({
         id: data.user.id,
         email,
-        full_name: fullName || null,
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
+        full_name,
+        phone: phone.trim() || null,
+        requested_role: requestedRole,
         role: 'data_entry',
         status: 'pending',
       })
@@ -101,36 +114,11 @@ function Signup() {
   return (
     <div className="page auth-page">
       <motion.div
-        className="auth-shell"
+        className="auth-shell auth-shell--centered"
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: 'easeOut' }}
       >
-        <div className="auth-hero">
-          <div className="auth-hero-inner">
-            <p className="eyebrow">Cholera Watch</p>
-            <h2 className="auth-hero-title">Request access to the dashboard</h2>
-            <p className="auth-hero-subtitle">
-              Create an account so system administrators can assign you the right role for data
-              entry, analytics, or decision-making.
-            </p>
-            <div className="auth-hero-metrics">
-              <div className="auth-hero-pill">
-                <span>🧪</span>
-                Data quality controls
-              </div>
-              <div className="auth-hero-pill">
-                <span>👥</span>
-                Multi-role workflow
-              </div>
-              <div className="auth-hero-pill">
-                <span>✅</span>
-                Admin approval
-              </div>
-            </div>
-          </div>
-        </div>
-
         <section className="auth-card chart-card">
           <div className="section-header">
             <h3>Create an account</h3>
@@ -139,21 +127,90 @@ function Signup() {
 
           <form className="signup-form" onSubmit={handleSubmit}>
             <div className="form-grid">
-              {/* Full Name Field */}
+              {/* First Name Field */}
               <div className="form-field">
-                <label htmlFor="signup-name" className="form-label">
-                  <span className="label-text">👤Full name</span>
+                <label htmlFor="signup-first-name" className="form-label">
+                  <span className="label-text">👤 First name</span>
+                  <span className="label-required">required</span>
+                </label>
+                <div className="input-wrapper">
+                  <span className="input-icon"></span>
+                  <input
+                    id="signup-first-name"
+                    type="text"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    autoComplete="given-name"
+                    placeholder="John"
+                    className="form-input with-icon"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Last Name Field */}
+              <div className="form-field">
+                <label htmlFor="signup-last-name" className="form-label">
+                  <span className="label-text">👤 Last name</span>
+                  <span className="label-required">required</span>
+                </label>
+                <div className="input-wrapper">
+                  <span className="input-icon"></span>
+                  <input
+                    id="signup-last-name"
+                    type="text"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    autoComplete="family-name"
+                    placeholder="Doe"
+                    className="form-input with-icon"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Role Field (requested) */}
+              <div className="form-field">
+                <label htmlFor="signup-role" className="form-label">
+                  <span className="label-text">🧩 Requested role</span>
+                  <span className="label-required">required</span>
+                </label>
+                <div className="input-wrapper">
+                  <span className="input-icon"></span>
+                  <select
+                    id="signup-role"
+                    value={requestedRole}
+                    onChange={(e) => setRequestedRole(e.target.value)}
+                    className="form-input with-icon"
+                    required
+                  >
+                    <option value="data_entry">Data Entry</option>
+                    <option value="epidemiologist">Epidemiologist</option>
+                    <option value="surveillance">Surveillance</option>
+                    <option value="data_manager">Data Manager</option>
+                    <option value="system_admin">System Admin</option>
+                  </select>
+                </div>
+                <p className="field-hint">
+                  Your account will remain <strong>pending</strong> until a System Admin approves and assigns access.
+                </p>
+              </div>
+
+              {/* Phone Field */}
+              <div className="form-field">
+                <label htmlFor="signup-phone" className="form-label">
+                  <span className="label-text">📱 Phone number</span>
                   <span className="label-optional">optional</span>
                 </label>
                 <div className="input-wrapper">
                   <span className="input-icon"></span>
                   <input
-                    id="signup-name"
-                    type="text"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    autoComplete="name"
-                    placeholder="John Doe"
+                    id="signup-phone"
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    autoComplete="tel"
+                    placeholder="+256 7XX XXX XXX"
                     className="form-input with-icon"
                   />
                 </div>
@@ -397,6 +454,13 @@ function Signup() {
           font-size: 1rem;
           transition: all 0.2s ease;
           background: white;
+        }
+
+        .field-hint {
+          margin: 0.35rem 0 0;
+          font-size: 0.85rem;
+          color: #64748b;
+          line-height: 1.4;
         }
 
         .form-input:focus {
